@@ -10,7 +10,8 @@ export default function DriverDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState(false)
   const [pendingTrips, setPendingTrips] = useState([])
-  const [accepting, setAccepting] = useState(null)
+const [skippedIds, setSkippedIds] = useState([])  
+const [accepting, setAccepting] = useState(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -75,14 +76,14 @@ export default function DriverDashboardPage() {
       return
     }
 
-    const loadPendingTrips = async () => {
+const loadPendingTrips = async () => {
       const { data } = await supabase
         .from('trips')
         .select('*')
         .eq('status', 'requested')
         .order('requested_at', { ascending: false })
 
-      setPendingTrips(data || [])
+      setPendingTrips((data || []).filter((t) => !skippedIds.includes(t.id)))
     }
 
     loadPendingTrips()
@@ -219,7 +220,10 @@ export default function DriverDashboardPage() {
                       {accepting === trip.id ? 'Accepting...' : 'Accept'}
                     </button>
                     <button
-                      onClick={() => setPendingTrips((prev) => prev.filter((t) => t.id !== trip.id))}
+                      onClick={() => {
+                        setSkippedIds((prev) => [...prev, trip.id])
+                        setPendingTrips((prev) => prev.filter((t) => t.id !== trip.id))
+                      }}
                       className="flex-1 bg-gray-200 text-gray-700 rounded-xl py-2 font-semibold hover:bg-gray-300 transition"
                     >
                       Skip

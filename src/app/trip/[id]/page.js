@@ -16,6 +16,7 @@ export default function DriverTripPage() {
   const [reportingNoShow, setReportingNoShow] = useState(false)
   const [noShowError, setNoShowError] = useState('')
   const [passenger, setPassenger] = useState(null)
+  const [passengerError, setPassengerError] = useState('')
 
   useEffect(() => {
     const loadTrip = async () => {
@@ -57,6 +58,7 @@ export default function DriverTripPage() {
 
       if (error) {
         console.log('Could not load passenger contact:', error.message)
+        setPassengerError(error.message)
         return
       }
 
@@ -188,6 +190,12 @@ export default function DriverTripPage() {
             Call
           </a>
         </div>
+      )}
+
+      {passengerError && !showPassengerCard && (
+        <p className="text-center text-xs text-red-500 px-4 mb-2">
+          Could not load passenger contact: {passengerError}
+        </p>
       )}
 
       {showMap && (

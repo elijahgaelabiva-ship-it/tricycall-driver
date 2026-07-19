@@ -3,11 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { normalizePhone, isValidPhone, phoneToAuthEmail } from '@/lib/phone'
 
 export default function DriverRegisterPage() {
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [licenseNumber, setLicenseNumber] = useState('')
   const [plateNumber, setPlateNumber] = useState('')
@@ -19,21 +19,33 @@ export default function DriverRegisterPage() {
   const handleRegister = async (e) => {
     e.preventDefault()
     setError('')
+
+    const normalizedPhone = normalizePhone(phone)
+
+    if (!isValidPhone(normalizedPhone)) {
+      setError('Please enter a valid PH mobile number (e.g. 09171234567).')
+      return
+    }
+
     setLoading(true)
 
     const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
+      email: phoneToAuthEmail(normalizedPhone),
       password,
     })
 
     if (signUpError) {
-      setError(signUpError.message)
+      if (signUpError.message.toLowerCase().includes('already registered')) {
+        setError('This phone number is already registered. Try logging in instead.')
+      } else {
+        setError(signUpError.message)
+      }
       setLoading(false)
       return
     }
 
     if (!data.session) {
-      setError('Please check your email to confirm your account before continuing.')
+      setError('Account created, but could not sign you in automatically. Please try logging in.')
       setLoading(false)
       return
     }
@@ -43,7 +55,7 @@ export default function DriverRegisterPage() {
     const { error: profileError } = await supabase.from('profiles').insert({
       id: userId,
       full_name: fullName,
-      phone: phone,
+      phone: normalizedPhone,
       role: 'driver',
     })
 
@@ -109,18 +121,9 @@ export default function DriverRegisterPage() {
 
         <input
           type="tel"
-          placeholder="Phone Number"
+          placeholder="Phone Number (e.g. 09171234567)"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
-          required
-          className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
-        />
-
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
           required
           className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
         />

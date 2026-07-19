@@ -3,9 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { normalizePhone, isValidPhone, phoneToAuthEmail } from '@/lib/phone'
 
 export default function DriverLoginPage() {
-  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -14,15 +15,23 @@ export default function DriverLoginPage() {
   const handleLogin = async (e) => {
     e.preventDefault()
     setError('')
+
+    const normalizedPhone = normalizePhone(phone)
+
+    if (!isValidPhone(normalizedPhone)) {
+      setError('Please enter a valid PH mobile number (e.g. 09171234567).')
+      return
+    }
+
     setLoading(true)
 
     const { error: loginError } = await supabase.auth.signInWithPassword({
-      email,
+      email: phoneToAuthEmail(normalizedPhone),
       password,
     })
 
     if (loginError) {
-      setError(loginError.message)
+      setError('Incorrect phone number or password.')
       setLoading(false)
       return
     }
@@ -48,10 +57,10 @@ export default function DriverLoginPage() {
         )}
 
         <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          type="tel"
+          placeholder="Phone Number (e.g. 09171234567)"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
           required
           className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
         />

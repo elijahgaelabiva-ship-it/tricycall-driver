@@ -13,6 +13,8 @@ export default function DriverTripPage() {
   const [trip, setTrip] = useState(null)
   const [updating, setUpdating] = useState(false)
   const [driverLocation, setDriverLocation] = useState(null)
+  const [reportingNoShow, setReportingNoShow] = useState(false)
+  const [noShowError, setNoShowError] = useState('')
 
   useEffect(() => {
     const loadTrip = async () => {
@@ -43,8 +45,6 @@ export default function DriverTripPage() {
   }, [id])
 
   // Keep tracking + broadcasting the driver's live GPS position while this trip is active.
-  // (Previously this only ran on the dashboard page and stopped as soon as the driver
-  // navigated here — which meant location updates went stale mid-trip.)
   useEffect(() => {
     if (!trip) return
     if (['completed', 'cancelled'].includes(trip.status)) return
@@ -91,6 +91,24 @@ export default function DriverTripPage() {
     }
 
     setUpdating(false)
+  }
+
+  const reportNoShow = async () => {
+    setReportingNoShow(true)
+    setNoShowError('')
+
+    const { error } = await supabase.rpc('report_no_show', {
+      target_trip_id: id,
+    })
+
+    if (error) {
+      setNoShowError(error.message)
+      setReportingNoShow(false)
+      return
+    }
+
+    setTrip({ ...trip, status: 'cancelled' })
+    router.push('/dashboard')
   }
 
   const nextStepMap = {
@@ -153,6 +171,20 @@ export default function DriverTripPage() {
             >
               {updating ? 'Updating...' : step.label}
             </button>
+          )}
+
+          {trip.status === 'arrived' && (
+            <button
+              onClick={reportNoShow}
+              disabled={reportingNoShow}
+              className="w-full bg-red-100 text-red-600 rounded-xl py-3 font-semibold hover:bg-red-200 transition disabled:opacity-50"
+            >
+              {reportingNoShow ? 'Reporting...' : 'Passenger No-Show'}
+            </button>
+          )}
+
+          {noShowError && (
+            <p className="text-red-600 text-sm">{noShowError}</p>
           )}
 
           {trip.status === 'completed' && (

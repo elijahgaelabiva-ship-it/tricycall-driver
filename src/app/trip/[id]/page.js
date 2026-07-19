@@ -15,6 +15,7 @@ export default function DriverTripPage() {
   const [driverLocation, setDriverLocation] = useState(null)
   const [reportingNoShow, setReportingNoShow] = useState(false)
   const [noShowError, setNoShowError] = useState('')
+  const [passenger, setPassenger] = useState(null)
 
   useEffect(() => {
     const loadTrip = async () => {
@@ -43,6 +44,29 @@ export default function DriverTripPage() {
       supabase.removeChannel(channel)
     }
   }, [id])
+
+  // Load the passenger's name + phone once we know the trip, via a safe
+  // database function (rather than querying profiles directly).
+  useEffect(() => {
+    if (!trip) return
+
+    const loadPassengerContact = async () => {
+      const { data, error } = await supabase.rpc('get_trip_passenger_contact', {
+        target_trip_id: id,
+      })
+
+      if (error) {
+        console.log('Could not load passenger contact:', error.message)
+        return
+      }
+
+      if (data && data.length > 0) {
+        setPassenger(data[0])
+      }
+    }
+
+    loadPassengerContact()
+  }, [trip?.id, id])
 
   // Keep tracking + broadcasting the driver's live GPS position while this trip is active.
   useEffect(() => {
@@ -135,6 +159,7 @@ export default function DriverTripPage() {
       : { lat: trip.pickup_lat, lng: trip.pickup_lng }
 
   const showMap = driverLocation && !['completed', 'cancelled'].includes(trip.status)
+  const showPassengerCard = passenger && !['completed', 'cancelled'].includes(trip.status)
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
@@ -148,6 +173,22 @@ export default function DriverTripPage() {
           <p>Distance: {Number(trip.distance_km).toFixed(2)} km</p>
         </div>
       </div>
+
+      {showPassengerCard && (
+        <div className="mx-4 mb-2 p-4 bg-green-50 rounded-xl flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-500">Passenger</p>
+            <p className="font-semibold text-gray-800">{passenger.full_name}</p>
+            <p className="text-sm text-gray-600">{passenger.phone}</p>
+          </div>
+          
+            href={`tel:${passenger.phone}`}
+            className="bg-green-600 text-white rounded-full px-4 py-2 text-sm font-semibold"
+          >
+            Call
+          </a>
+        </div>
+      )}
 
       {showMap && (
         <div style={{ height: '350px', width: '100%', position: 'relative' }}>

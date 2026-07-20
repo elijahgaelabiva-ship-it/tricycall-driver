@@ -183,7 +183,7 @@ export default function DriverTripPage() {
             <p className="font-semibold text-gray-800">{passenger.full_name}</p>
             <p className="text-sm text-gray-600">{passenger.phone}</p>
           </div>
-          
+          <a
             href={`tel:${passenger.phone}`}
             className="bg-green-600 text-white rounded-full px-4 py-2 text-sm font-semibold"
           >

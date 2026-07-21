@@ -199,7 +199,6 @@ export default function DriverTripPage() {
       )}
 
       {showMap && (
-        <div style={{ height: '350px', width: '100%', position: 'relative' }}>
 	<div className="rounded-2xl overflow-hidden" style={{ height: '350px', width: '100%', position: 'relative' }}>
           <MapView driverLocation={driverLocation} targetLocation={targetLocation} />
         </div>

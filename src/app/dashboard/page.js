@@ -154,6 +154,15 @@ const loadPendingTrips = async () => {
 
   return (
     <div className="min-h-screen bg-white px-4 py-8 flex flex-col items-center">
+      <div className="w-full max-w-sm flex justify-end">
+        <button
+          onClick={() => router.push('/profile')}
+          className="text-sm text-green-600 underline mb-2"
+        >
+          My Profile
+        </button>
+      </div>
+
       <h1 className="text-2xl font-bold text-green-600 mb-2">
         Welcome, {profile?.full_name}
       </h1>

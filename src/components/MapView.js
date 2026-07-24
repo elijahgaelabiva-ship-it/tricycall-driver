@@ -37,37 +37,21 @@ function bearingDegrees(a, b) {
   return (deg + 360) % 360
 }
 
+// Builds the tricycle marker icon, rotated to face the direction of travel.
+// This is a top-down image, so rotating it directly shows the tricycle
+// turning left/right/etc. as it moves — no separate arrow needed.
 function createDriverIcon(bearing) {
   const html = `
-    <div style="
-      width: 48px;
-      height: 48px;
-      position: relative;
-      transform: rotate(${bearing}deg);
-      transition: transform 0.3s linear;
-    ">
-      <div style="
-        position: absolute;
-        top: -10px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 0;
-        height: 0;
-        border-left: 6px solid transparent;
-        border-right: 6px solid transparent;
-        border-bottom: 12px solid #0a7d34;
-        z-index: 2;
-      "></div>
-      <img
-        src="/icons/driver-marker-64.png"
-        style="
-          width: 48px;
-          height: 48px;
-          display: block;
-          transform: rotate(${-bearing}deg);
-        "
-      />
-    </div>
+    <img
+      src="/icons/driver-marker-64.png"
+      style="
+        width: 48px;
+        height: 48px;
+        display: block;
+        transform: rotate(${bearing}deg);
+        transition: transform 0.3s linear;
+      "
+    />
   `
 
   return L.divIcon({

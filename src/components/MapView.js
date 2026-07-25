@@ -4,7 +4,13 @@ import { useEffect, useRef, useState } from 'react'
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
 
-const targetIcon = new L.Icon({
+const destinationIcon = new L.Icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+})
+
+const passengerIcon = new L.Icon({
   iconUrl: '/icons/destination-marker.png',
   iconSize: [42, 48],
   iconAnchor: [21, 48],
@@ -320,7 +326,7 @@ function DestinationSearchBox({ onSelect, biasCenter }) {
   )
 }
 
-export default function MapView({ driverLocation, targetLocation, onDestinationSelect }) {
+export default function MapView({ driverLocation, targetLocation, targetIsPassenger, onDestinationSelect }) {
   return (
     <div style={{ position: 'relative', height: '100%', width: '100%' }}>
       {onDestinationSelect && (
@@ -338,7 +344,10 @@ export default function MapView({ driverLocation, targetLocation, onDestinationS
         <DriverMarker location={driverLocation} />
         {targetLocation && (
           <>
-            <Marker position={[targetLocation.lat, targetLocation.lng]} icon={targetIcon} />
+            <Marker
+              position={[targetLocation.lat, targetLocation.lng]}
+              icon={targetIsPassenger ? passengerIcon : destinationIcon}
+            />
             <RouteLayer start={driverLocation} end={targetLocation} />
             <FlyToLocation location={targetLocation} />
           </>

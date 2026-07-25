@@ -200,7 +200,11 @@ export default function DriverTripPage() {
 
       {showMap && (
 	<div className="rounded-2xl overflow-hidden" style={{ height: '350px', width: '100%', position: 'relative' }}>
-          <MapView driverLocation={driverLocation} targetLocation={targetLocation} />
+          <MapView
+            driverLocation={driverLocation}
+            targetLocation={targetLocation}
+            targetIsPassenger={trip.status !== 'ongoing'}
+          />
         </div>
       )}
 

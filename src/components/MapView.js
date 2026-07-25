@@ -113,16 +113,8 @@ function RouteLayer({ start, end }) {
 
   const drawRoute = async (start, end) => {
     try {
-      // Routed through our own /api/route proxy so the request to OSRM
-      // carries a proper identifying User-Agent (browsers won't let us
-      // set that header directly on a client-side fetch).
-      const params = new URLSearchParams({
-        startLat: start.lat,
-        startLng: start.lng,
-        endLat: end.lat,
-        endLng: end.lng,
-      })
-      const res = await fetch(`/api/route?${params.toString()}`)
+      const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`
+      const res = await fetch(url)
 
       if (!res.ok) throw new Error('Routing request failed')
 
@@ -178,24 +170,180 @@ function RouteLayer({ start, end }) {
   return null
 }
 
-export default function MapView({ driverLocation, targetLocation }) {
+// Flies the map to a location whenever it changes (e.g. after the passenger
+// picks an address from the search box).
+function FlyToLocation({ location }) {
+  const map = useMap()
+  const lastRef = useRef(null)
+
+  useEffect(() => {
+    if (!location) return
+    const last = lastRef.current
+    if (last && last.lat === location.lat && last.lng === location.lng) return
+    lastRef.current = location
+    map.flyTo([location.lat, location.lng], 16, { duration: 1 })
+  }, [location?.lat, location?.lng])
+
+  return null
+}
+
+// "Where to?" search box overlaid on the map. Debounces requests to
+// Nominatim (OSM's free geocoder) as the passenger types, shows matching
+// addresses, and reports the chosen lat/lng back to the parent.
+function DestinationSearchBox({ onSelect, biasCenter }) {
+  const [query, setQuery] = useState('')
+  const [suggestions, setSuggestions] = useState([])
+  const [loading, setLoading] = useState(false)
+  const debounceRef = useRef(null)
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+
+    if (!query || query.trim().length < 3) {
+      setSuggestions([])
+      return
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const params = new URLSearchParams({
+          format: 'json',
+          q: query,
+          limit: '5',
+          addressdetails: '1',
+        })
+
+        // Nudge results toward the passenger's current area without
+        // hard-restricting them to it.
+        if (biasCenter) {
+          const delta = 0.3
+          params.set(
+            'viewbox',
+            [
+              biasCenter.lng - delta,
+              biasCenter.lat + delta,
+              biasCenter.lng + delta,
+              biasCenter.lat - delta,
+            ].join(',')
+          )
+          params.set('bounded', '0')
+        }
+
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+          headers: { 'Accept-Language': 'en' },
+        })
+        const data = await res.json()
+        setSuggestions(data || [])
+      } catch (err) {
+        console.log('Geocoding search failed:', err.message)
+        setSuggestions([])
+      } finally {
+        setLoading(false)
+      }
+    }, 450)
+
+    return () => clearTimeout(debounceRef.current)
+  }, [query, biasCenter?.lat, biasCenter?.lng])
+
+  const handleSelect = (place) => {
+    const location = { lat: parseFloat(place.lat), lng: parseFloat(place.lon) }
+    setQuery(place.display_name)
+    setSuggestions([])
+    onSelect(location, place.display_name)
+  }
+
   return (
-    <MapContainer
-      center={[driverLocation.lat, driverLocation.lng]}
-      zoom={15}
-      style={{ height: '100%', width: '100%' }}
-    >
-      <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-        attribution='&copy; OpenStreetMap contributors &copy; CARTO'
+    <div style={{ position: 'absolute', top: 12, left: 12, right: 12, zIndex: 1000 }}>
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Where to?"
+        style={{
+          width: '100%',
+          padding: '14px 18px',
+          borderRadius: 999,
+          border: 'none',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+          fontSize: 16,
+          textAlign: 'center',
+          outline: 'none',
+          boxSizing: 'border-box',
+        }}
       />
-      <DriverMarker location={driverLocation} />
-      {targetLocation && (
-        <>
-          <Marker position={[targetLocation.lat, targetLocation.lng]} icon={targetIcon} />
-          <RouteLayer start={driverLocation} end={targetLocation} />
-        </>
+
+      {loading && (
+        <div
+          style={{
+            background: 'white',
+            borderRadius: 12,
+            marginTop: 6,
+            padding: '10px 16px',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
+            fontSize: 14,
+            color: '#666',
+          }}
+        >
+          Searching...
+        </div>
       )}
-    </MapContainer>
+
+      {!loading && suggestions.length > 0 && (
+        <div
+          style={{
+            background: 'white',
+            borderRadius: 12,
+            marginTop: 6,
+            boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
+            overflow: 'hidden',
+          }}
+        >
+          {suggestions.map((place) => (
+            <div
+              key={place.place_id}
+              onClick={() => handleSelect(place)}
+              style={{
+                padding: '12px 16px',
+                borderBottom: '1px solid #eee',
+                cursor: 'pointer',
+                fontSize: 14,
+                textAlign: 'left',
+              }}
+            >
+              {place.display_name}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function MapView({ driverLocation, targetLocation, onDestinationSelect }) {
+  return (
+    <div style={{ position: 'relative', height: '100%', width: '100%' }}>
+      {onDestinationSelect && (
+        <DestinationSearchBox onSelect={onDestinationSelect} biasCenter={driverLocation} />
+      )}
+      <MapContainer
+        center={[driverLocation.lat, driverLocation.lng]}
+        zoom={15}
+        style={{ height: '100%', width: '100%' }}
+      >
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; OpenStreetMap contributors &copy; CARTO'
+        />
+        <DriverMarker location={driverLocation} />
+        {targetLocation && (
+          <>
+            <Marker position={[targetLocation.lat, targetLocation.lng]} icon={targetIcon} />
+            <RouteLayer start={driverLocation} end={targetLocation} />
+            <FlyToLocation location={targetLocation} />
+          </>
+        )}
+      </MapContainer>
+    </div>
   )
 }

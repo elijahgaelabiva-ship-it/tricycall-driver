@@ -1,41 +1,31 @@
-// Server-side proxy for Nominatim (OSM) geocoding.
-//
-// Nominatim's usage policy requires a valid, identifying User-Agent (or
-// Referer) header on every request: https://operations.osmfoundation.org/policies/nominatim/
-// Browsers won't let client-side fetch() set a custom User-Agent, so this
-// route runs the request on the server instead, where we can.
-//
-// Update the User-Agent string below with your actual app name and a
-// contact URL/email — that's what the policy asks for.
+// Server-side proxy for the public OSRM routing demo server.
+// Same reasoning as /api/geocode: a browser fetch() can't set a custom
+// User-Agent, so we make the request here where we can identify the app
+// as OSRM's usage policy asks: http://project-osrm.org/docs/v5.24.0/api/#general-options
 
 const USER_AGENT = 'Tricycall/1.0 (https://tricycall.com; contact@tricycall.com)'
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url)
 
-  const params = new URLSearchParams({
-    format: 'json',
-    q: searchParams.get('q') || '',
-    limit: searchParams.get('limit') || '5',
-    addressdetails: '1',
-  })
+  const startLat = searchParams.get('startLat')
+  const startLng = searchParams.get('startLng')
+  const endLat = searchParams.get('endLat')
+  const endLng = searchParams.get('endLng')
 
-  const viewbox = searchParams.get('viewbox')
-  if (viewbox) {
-    params.set('viewbox', viewbox)
-    params.set('bounded', searchParams.get('bounded') || '0')
+  if (!startLat || !startLng || !endLat || !endLng) {
+    return Response.json({ error: 'Missing coordinates' }, { status: 400 })
   }
 
+  const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`
+
   try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
-      headers: {
-        'User-Agent': USER_AGENT,
-        'Accept-Language': 'en',
-      },
+    const res = await fetch(url, {
+      headers: { 'User-Agent': USER_AGENT },
     })
 
     if (!res.ok) {
-      return Response.json({ error: 'Geocoding request failed' }, { status: res.status })
+      return Response.json({ error: 'Routing request failed' }, { status: res.status })
     }
 
     const data = await res.json()

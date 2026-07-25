@@ -237,7 +237,15 @@ export default function DriverTripPage() {
           )}
 
           {trip.status === 'completed' && (
-            <p className="text-gray-500">This trip is complete. Nice work!</p>
+            <>
+              <p className="text-gray-500">This trip is complete. Nice work!</p>
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="w-full bg-green-600 text-white rounded-xl py-3 font-semibold hover:bg-green-700 transition"
+              >
+                Back to Dashboard
+              </button>
+            </>
           )}
 
           <button

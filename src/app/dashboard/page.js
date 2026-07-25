@@ -8,6 +8,8 @@ export default function DriverDashboardPage() {
   const [profile, setProfile] = useState(null)
   const [driver, setDriver] = useState(null)
   const [vehicle, setVehicle] = useState(null)
+  const [avgRating, setAvgRating] = useState(null)
+  const [ratingCount, setRatingCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState(false)
   const [pendingTrips, setPendingTrips] = useState([])
@@ -101,6 +103,29 @@ const loadPendingTrips = async () => {
     return () => clearInterval(interval)
   }, [driver?.is_online])
 
+  // Load the driver's average rating from past trips
+  useEffect(() => {
+    if (!driver?.id) return
+
+    const loadRatings = async () => {
+      const { data } = await supabase
+        .from('ratings')
+        .select('rating')
+        .eq('driver_id', driver.id)
+
+      if (data && data.length > 0) {
+        const avg = data.reduce((sum, r) => sum + r.rating, 0) / data.length
+        setAvgRating(avg)
+        setRatingCount(data.length)
+      } else {
+        setAvgRating(null)
+        setRatingCount(0)
+      }
+    }
+
+    loadRatings()
+  }, [driver?.id])
+
   const toggleOnline = async () => {
     setToggling(true)
 
@@ -181,6 +206,11 @@ const loadPendingTrips = async () => {
 
           <p className="font-semibold text-gray-800 mt-2">{profile?.full_name}</p>
           <p className="text-xs text-gray-500">TRICYCALL.SF Driver</p>
+          <p className="text-sm text-yellow-500 mt-1">
+            {ratingCount > 0
+              ? `★ ${avgRating.toFixed(1)} (${ratingCount} ratings)`
+              : 'New driver — no ratings yet'}
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-4 text-left">

@@ -5,9 +5,9 @@ import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
 
 const targetIcon = new L.Icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
+  iconUrl: '/icons/destination-marker.png',
+  iconSize: [42, 48],
+  iconAnchor: [21, 48],
 })
 
 function distanceMeters(a, b) {

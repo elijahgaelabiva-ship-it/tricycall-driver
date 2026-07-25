@@ -153,52 +153,53 @@ const loadPendingTrips = async () => {
   }
 
   return (
-    <div className="min-h-screen bg-white px-4 py-8 flex flex-col items-center">
-      <div className="w-full max-w-sm flex justify-end">
-        <button
-          onClick={() => router.push('/profile')}
-          className="text-sm text-green-600 underline mb-2"
-        >
-          My Profile
-        </button>
-      </div>
+    <div className="min-h-screen bg-white px-4 py-4 flex flex-col items-center">
+      <div
+        onClick={() => router.push('/profile')}
+        className="w-full max-w-sm bg-white rounded-2xl shadow-md p-3 mb-4 flex items-center gap-3 text-left hover:shadow-lg transition cursor-pointer"
+      >
+        {profile?.avatar_url ? (
+          <img
+            src={profile.avatar_url}
+            alt={profile.full_name}
+            className="w-14 h-14 rounded-full object-cover flex-shrink-0"
+          />
+        ) : (
+          <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-xl flex-shrink-0">
+            {profile?.full_name?.charAt(0).toUpperCase() || '?'}
+          </div>
+        )}
 
-      <h1 className="text-2xl font-bold text-green-600 mb-2">
-        Welcome, {profile?.full_name}
-      </h1>
-      <p className="text-gray-500 mb-6">TRICYCALL.SF Driver</p>
-
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-8 text-center space-y-6 mb-8">
-        <div>
-          <p className="text-sm text-gray-500 mb-1">Status</p>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-gray-800 truncate">{profile?.full_name}</p>
+          <p className="text-xs text-gray-500">TRICYCALL.SF Driver</p>
           <p
-            className={`text-xl font-bold ${
+            className={`text-sm font-bold ${
               driver.is_online ? 'text-green-600' : 'text-gray-400'
             }`}
           >
-            {driver.is_online ? 'Online' : 'Offline'}
+            {driver.is_online ? '● Online' : '● Offline'}
           </p>
         </div>
 
         <button
-          onClick={toggleOnline}
+          onClick={(e) => {
+            e.stopPropagation()
+            toggleOnline()
+          }}
           disabled={toggling}
-          className={`w-full rounded-xl py-4 font-semibold text-white transition disabled:opacity-50 ${
+          className={`flex-shrink-0 rounded-xl px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-50 ${
             driver.is_online
               ? 'bg-gray-400 hover:bg-gray-500'
               : 'bg-green-600 hover:bg-green-700'
           }`}
         >
-          {toggling
-            ? 'Updating...'
-            : driver.is_online
-            ? 'Go Offline'
-            : 'Go Online'}
+          {toggling ? '...' : driver.is_online ? 'Go Offline' : 'Go Online'}
         </button>
       </div>
 
       {driver.is_online && (
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-sm flex-1">
           <h2 className="text-lg font-bold text-gray-700 mb-3">
             Ride Requests
           </h2>

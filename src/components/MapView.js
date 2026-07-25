@@ -113,8 +113,16 @@ function RouteLayer({ start, end }) {
 
   const drawRoute = async (start, end) => {
     try {
-      const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`
-      const res = await fetch(url)
+      // Routed through our own /api/route proxy so the request to OSRM
+      // carries a proper identifying User-Agent (browsers won't let us
+      // set that header directly on a client-side fetch).
+      const params = new URLSearchParams({
+        startLat: start.lat,
+        startLng: start.lng,
+        endLat: end.lat,
+        endLng: end.lng,
+      })
+      const res = await fetch(`/api/route?${params.toString()}`)
 
       if (!res.ok) throw new Error('Routing request failed')
 

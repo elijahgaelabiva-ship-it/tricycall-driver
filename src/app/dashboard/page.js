@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 export default function DriverDashboardPage() {
   const [profile, setProfile] = useState(null)
   const [driver, setDriver] = useState(null)
+  const [vehicle, setVehicle] = useState(null)
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState(false)
   const [pendingTrips, setPendingTrips] = useState([])
@@ -37,8 +38,15 @@ const [accepting, setAccepting] = useState(null)
         .eq('id', user.id)
         .single()
 
+      const { data: vehicleData } = await supabase
+        .from('vehicles')
+        .select('*')
+        .eq('driver_id', user.id)
+        .maybeSingle()
+
       setProfile(profileData)
       setDriver(driverData)
+      setVehicle(vehicleData)
       setLoading(false)
     }
 
@@ -156,23 +164,45 @@ const loadPendingTrips = async () => {
     <div className="min-h-screen bg-white px-4 py-4 flex flex-col items-center">
       <div
         onClick={() => router.push('/profile')}
-        className="w-full max-w-sm bg-white rounded-2xl shadow-md p-3 mb-4 flex items-center gap-3 text-left hover:shadow-lg transition cursor-pointer"
+        className="w-full max-w-sm bg-white rounded-2xl shadow-md p-4 mb-4 cursor-pointer hover:shadow-lg transition"
       >
-        {profile?.avatar_url ? (
-          <img
-            src={profile.avatar_url}
-            alt={profile.full_name}
-            className="w-14 h-14 rounded-full object-cover flex-shrink-0"
-          />
-        ) : (
-          <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-xl flex-shrink-0">
-            {profile?.full_name?.charAt(0).toUpperCase() || '?'}
-          </div>
-        )}
+        <div className="flex flex-col items-center text-center">
+          {profile?.avatar_url ? (
+            <img
+              src={profile.avatar_url}
+              alt={profile.full_name}
+              className="w-24 h-24 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-24 h-24 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-3xl">
+              {profile?.full_name?.charAt(0).toUpperCase() || '?'}
+            </div>
+          )}
 
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-800 truncate">{profile?.full_name}</p>
+          <p className="font-semibold text-gray-800 mt-2">{profile?.full_name}</p>
           <p className="text-xs text-gray-500">TRICYCALL.SF Driver</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-4 text-left">
+          <div>
+            <p className="text-xs text-gray-500">Contact Number</p>
+            <p className="text-sm font-semibold text-gray-800 truncate">{profile?.phone}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500">License Number</p>
+            <p className="text-sm font-semibold text-gray-800 truncate">{driver?.license_number}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500">Plate Number</p>
+            <p className="text-sm font-semibold text-gray-800 truncate">{vehicle?.plate_number || '—'}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500">Vehicle Model</p>
+            <p className="text-sm font-semibold text-gray-800 truncate">{vehicle?.model || '—'}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t border-gray-100">
           <p
             className={`text-sm font-bold ${
               driver.is_online ? 'text-green-600' : 'text-gray-400'
@@ -180,22 +210,22 @@ const loadPendingTrips = async () => {
           >
             {driver.is_online ? '● Online' : '● Offline'}
           </p>
-        </div>
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            toggleOnline()
-          }}
-          disabled={toggling}
-          className={`flex-shrink-0 rounded-xl px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-50 ${
-            driver.is_online
-              ? 'bg-gray-400 hover:bg-gray-500'
-              : 'bg-green-600 hover:bg-green-700'
-          }`}
-        >
-          {toggling ? '...' : driver.is_online ? 'Go Offline' : 'Go Online'}
-        </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleOnline()
+            }}
+            disabled={toggling}
+            className={`flex-shrink-0 rounded-xl px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-50 ${
+              driver.is_online
+                ? 'bg-gray-400 hover:bg-gray-500'
+                : 'bg-green-600 hover:bg-green-700'
+            }`}
+          >
+            {toggling ? '...' : driver.is_online ? 'Go Offline' : 'Go Online'}
+          </button>
+        </div>
       </div>
 
       {driver.is_online && (

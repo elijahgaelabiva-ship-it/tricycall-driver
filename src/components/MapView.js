@@ -11,9 +11,9 @@ const destinationIcon = new L.Icon({
 })
 
 const passengerIcon = new L.Icon({
-  iconUrl: '/icons/destination-marker.png',
-  iconSize: [42, 48],
-  iconAnchor: [21, 48],
+  iconUrl: '/icons/passenger-marker.png',
+  iconSize: [39, 46], // matches the badge's real aspect ratio — do not force-square this
+  iconAnchor: [0, 19], // the pointing fingertip
 })
 
 // San Felipe, Zambales fallback center. The map must render immediately on

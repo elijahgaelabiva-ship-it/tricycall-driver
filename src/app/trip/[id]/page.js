@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase'
@@ -17,6 +17,8 @@ export default function DriverTripPage() {
   const [noShowError, setNoShowError] = useState('')
   const [passenger, setPassenger] = useState(null)
   const [passengerError, setPassengerError] = useState('')
+  const tripStatusRef = useRef(null)
+  const watchIdRef = useRef(null)
 
   useEffect(() => {
     const loadTrip = async () => {
@@ -70,18 +72,66 @@ export default function DriverTripPage() {
     loadPassengerContact()
   }, [trip?.id, id])
 
-  // Keep tracking + broadcasting the driver's live GPS position while this trip is active.
+  // Keep a ref of the latest status (so the GPS watcher's closure, which is
+  // only created once per driver_id rather than on every status change,
+  // can still see up-to-date status) and explicitly stop GPS tracking the
+  // moment the trip actually ends.
   useEffect(() => {
-    if (!trip) return
-    if (['completed', 'cancelled'].includes(trip.status)) return
+    tripStatusRef.current = trip?.status
+    if (['completed', 'cancelled'].includes(trip?.status) && watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current)
+      watchIdRef.current = null
+    }
+  }, [trip?.status])
+
+  // Keep tracking + broadcasting the driver's live GPS position for the
+  // whole trip lifecycle. This watcher is intentionally NOT torn down on
+  // every status change (accepted -> arrived -> ongoing) — only when the
+  // trip actually ends or the driver changes — so there's no gap in
+  // tracking at each transition. Local state updates on every GPS tick for
+  // a responsive self-view, but the database write (and therefore what the
+  // passenger sees over realtime) is throttled to avoid hammering Supabase
+  // and burning mobile data on every single GPS callback.
+  useEffect(() => {
+    if (!trip?.driver_id) return
     if (!navigator.geolocation) return
+    if (['completed', 'cancelled'].includes(tripStatusRef.current)) return
+
+    const lastWriteRef = { current: null } // { lat, lng, time }
+    const MIN_WRITE_INTERVAL_MS = 6000
+    const MIN_WRITE_DISTANCE_M = 15
+
+    const toRad = (d) => (d * Math.PI) / 180
+    const distanceMeters = (a, b) => {
+      const R = 6371000
+      const dLat = toRad(b.lat - a.lat)
+      const dLng = toRad(b.lng - a.lng)
+      const s =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
+      return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s))
+    }
 
     const watchId = navigator.geolocation.watchPosition(
       async (position) => {
         const lat = position.coords.latitude
         const lng = position.coords.longitude
 
+        // Always update local state immediately for a smooth self-view.
         setDriverLocation({ lat, lng })
+
+        // Stop writing once the trip has ended, even if the watcher is
+        // still momentarily active during cleanup.
+        if (['completed', 'cancelled'].includes(tripStatusRef.current)) return
+
+        const now = Date.now()
+        const last = lastWriteRef.current
+        const movedEnough = !last || distanceMeters(last, { lat, lng }) > MIN_WRITE_DISTANCE_M
+        const enoughTimePassed = !last || now - last.time > MIN_WRITE_INTERVAL_MS
+
+        if (!movedEnough && !enoughTimePassed) return
+
+        lastWriteRef.current = { lat, lng, time: now }
 
         const { error } = await supabase
           .from('drivers')
@@ -91,11 +141,16 @@ export default function DriverTripPage() {
         if (error) console.log('Location update error:', error)
       },
       (error) => console.log('Location error:', error),
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
     )
 
-    return () => navigator.geolocation.clearWatch(watchId)
-  }, [trip?.status, trip?.driver_id])
+    watchIdRef.current = watchId
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId)
+      watchIdRef.current = null
+    }
+  }, [trip?.driver_id])
 
   const updateStatus = async (newStatus) => {
     setUpdating(true)
@@ -160,7 +215,7 @@ export default function DriverTripPage() {
       ? { lat: trip.dropoff_lat, lng: trip.dropoff_lng }
       : { lat: trip.pickup_lat, lng: trip.pickup_lng }
 
-  const showMap = driverLocation && !['completed', 'cancelled'].includes(trip.status)
+  const showMap = !['completed', 'cancelled'].includes(trip.status)
   const showPassengerCard = passenger && !['completed', 'cancelled'].includes(trip.status)
 
   return (
@@ -206,12 +261,6 @@ export default function DriverTripPage() {
             targetIsPassenger={trip.status !== 'ongoing'}
           />
         </div>
-      )}
-
-      {!showMap && !['completed', 'cancelled'].includes(trip.status) && (
-        <p className="text-center text-sm text-gray-400 px-4 pb-2">
-          Getting your location...
-        </p>
       )}
 
       <div className="flex-1 flex items-center justify-center px-4 py-6">

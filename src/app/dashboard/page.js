@@ -60,20 +60,44 @@ const [accepting, setAccepting] = useState(null)
     if (!driver?.is_online) return
     if (!navigator.geolocation) return
 
+    const lastWriteRef = { current: null } // { lat, lng, time }
+    const MIN_WRITE_INTERVAL_MS = 8000 // idle/waiting drivers can update a bit less often than active-trip drivers
+    const MIN_WRITE_DISTANCE_M = 20
+
+    const toRad = (d) => (d * Math.PI) / 180
+    const distanceMeters = (a, b) => {
+      const R = 6371000
+      const dLat = toRad(b.lat - a.lat)
+      const dLng = toRad(b.lng - a.lng)
+      const s =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
+      return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s))
+    }
+
     const watchId = navigator.geolocation.watchPosition(
       async (position) => {
+        const lat = position.coords.latitude
+        const lng = position.coords.longitude
+
+        const now = Date.now()
+        const last = lastWriteRef.current
+        const movedEnough = !last || distanceMeters(last, { lat, lng }) > MIN_WRITE_DISTANCE_M
+        const enoughTimePassed = !last || now - last.time > MIN_WRITE_INTERVAL_MS
+
+        if (!movedEnough && !enoughTimePassed) return
+
+        lastWriteRef.current = { lat, lng, time: now }
+
         const { error } = await supabase
           .from('drivers')
-          .update({
-            current_lat: position.coords.latitude,
-            current_lng: position.coords.longitude,
-          })
+          .update({ current_lat: lat, current_lng: lng })
           .eq('id', driver.id)
 
         if (error) console.log('Update error:', error)
       },
       (error) => console.log('Location error:', error),
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
     )
 
     return () => navigator.geolocation.clearWatch(watchId)

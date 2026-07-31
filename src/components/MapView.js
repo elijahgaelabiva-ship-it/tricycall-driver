@@ -12,8 +12,8 @@ const destinationIcon = new L.Icon({
 
 const passengerIcon = new L.Icon({
   iconUrl: '/icons/passenger-marker.png',
-  iconSize: [39, 46], // matches the badge's real aspect ratio — do not force-square this
-  iconAnchor: [0, 19], // the pointing fingertip
+  iconSize: [46, 46], // true square canvas — artwork padded, not stretched or cropped
+  iconAnchor: [4, 19], // the pointing fingertip
 })
 
 // San Felipe, Zambales fallback center. The map must render immediately on
@@ -76,6 +76,7 @@ function DriverMarker({ location }) {
   const [bearing, setBearing] = useState(0)
   const [renderPosition, setRenderPosition] = useState(location)
   const prevLocationRef = useRef(location)
+  const lastUpdateTimeRef = useRef(null)
   const animRef = useRef(null)
 
   useEffect(() => {
@@ -90,13 +91,22 @@ function DriverMarker({ location }) {
     const to = location
     prevLocationRef.current = location
 
+    const now = performance.now()
+    const prevUpdateTime = lastUpdateTimeRef.current
+    lastUpdateTimeRef.current = now
+
+    let duration = 900
+    if (prevUpdateTime) {
+      const elapsed = now - prevUpdateTime
+      duration = Math.min(8000, Math.max(900, elapsed))
+    }
+
     if (animRef.current) cancelAnimationFrame(animRef.current)
 
-    const duration = 900
-    const start = performance.now()
+    const start = now
 
-    const tick = (now) => {
-      const t = Math.min(1, (now - start) / duration)
+    const tick = (t2) => {
+      const t = Math.min(1, (t2 - start) / duration)
       setRenderPosition({
         lat: from.lat + (to.lat - from.lat) * t,
         lng: from.lng + (to.lng - from.lng) * t,

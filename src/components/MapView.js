@@ -53,7 +53,7 @@ function bearingDegrees(a, b) {
 function createDriverIcon(bearing) {
   const html = `
     <img
-      src="/icons/driver-marker-64.png"
+      src="/icons/driver-marker-v2.png"
       style="
         width: 48px;
         height: 48px;

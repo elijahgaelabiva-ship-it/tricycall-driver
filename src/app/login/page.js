@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { normalizePhone, isValidPhone, phoneToAuthEmail } from '@/lib/phone'
@@ -10,7 +10,20 @@ export default function DriverLoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [checkingIntro, setCheckingIntro] = useState(true)
   const router = useRouter()
+
+  // Show the one-time intro/onboarding slideshow on a driver's very first
+  // visit to the app, before they ever see the login form. Once they finish
+  // (or skip) it, intro.html sets this flag so it never shows again.
+  useEffect(() => {
+    const introSeen = typeof window !== 'undefined' && localStorage.getItem('tricycall_driver_intro_seen')
+    if (!introSeen) {
+      window.location.href = '/intro.html'
+      return
+    }
+    setCheckingIntro(false)
+  }, [])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -37,6 +50,14 @@ export default function DriverLoginPage() {
     }
 
     router.push('/dashboard')
+  }
+
+  if (checkingIntro) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <p className="text-gray-500">Loading...</p>
+      </div>
+    )
   }
 
   return (

@@ -153,7 +153,7 @@ function next(){
 function prev(){if(current>0){current--;render()}}
 function finish(){
   localStorage.setItem('tricycall_driver_intro_seen','1');
-  window.location.href='/login';
+  window.location.href='/login?from=intro';
 }
 let sx=0;
 document.querySelector('.slides').addEventListener('touchstart',e=>sx=e.changedTouches[0].screenX,{passive:true});

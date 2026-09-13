@@ -13,12 +13,16 @@ export default function DriverLoginPage() {
   const [checkingIntro, setCheckingIntro] = useState(true)
   const router = useRouter()
 
-  // Show the one-time intro/onboarding slideshow on a driver's very first
-  // visit to the app, before they ever see the login form. Once they finish
-  // (or skip) it, intro.html sets this flag so it never shows again.
+  // Show the intro/onboarding slideshow every time someone lands on login —
+  // except immediately after they just finished it (intro.html redirects
+  // back here with ?from=intro), which prevents an infinite redirect loop
+  // while still showing the intro on every fresh visit to the app.
   useEffect(() => {
-    const introSeen = typeof window !== 'undefined' && localStorage.getItem('tricycall_driver_intro_seen')
-    if (!introSeen) {
+    const fromIntro =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('from') === 'intro'
+
+    if (!fromIntro) {
       window.location.href = '/intro.html'
       return
     }

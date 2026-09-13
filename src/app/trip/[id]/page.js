@@ -7,6 +7,10 @@ import { supabase } from '@/lib/supabase'
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false })
 
+// Trip states where a passenger is depending on this driver right now.
+// Leaving the trip screen while in one of these counts as abandoning it.
+const ACTIVE_STATUSES = ['accepted', 'arrived', 'ongoing']
+
 export default function DriverTripPage() {
   const { id } = useParams()
   const router = useRouter()
@@ -135,7 +139,7 @@ export default function DriverTripPage() {
 
         const { error } = await supabase
           .from('drivers')
-          .update({ current_lat: lat, current_lng: lng })
+          .update({ current_lat: lat, current_lng: lng, last_ping_at: new Date().toISOString() })
           .eq('id', trip.driver_id)
 
         if (error) console.log('Location update error:', error)
@@ -190,6 +194,47 @@ export default function DriverTripPage() {
 
     setTrip({ ...trip, status: 'cancelled' })
     router.push('/dashboard')
+  }
+
+  // Best-effort warning if the driver tries to close the tab/app or hit
+  // the browser back button during an active trip. This can't guarantee a
+  // violation gets recorded (there's no time to make a network call once
+  // the page is actually being torn down) — it's just a nudge. The
+  // guaranteed recording path is leaveTripScreen() below, for in-app
+  // navigation, where we can await the call before actually navigating.
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (!ACTIVE_STATUSES.includes(tripStatusRef.current)) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [])
+
+  // Records one "abandoned an active trip" violation against this driver.
+  // After 3 violations the account is auto-suspended (see
+  // flag_driver_disconnect in Supabase). Failing silently here is
+  // intentional — a flaky network shouldn't trap the driver on this page.
+  const flagDisconnect = async () => {
+    try {
+      await supabase.rpc('flag_driver_disconnect', { target_trip_id: id })
+    } catch (err) {
+      console.log('Could not flag disconnect:', err)
+    }
+  }
+
+  // Use this instead of router.push() for any in-app link that leaves the
+  // trip screen, so an active trip gets flagged before the driver goes.
+  const leaveTripScreen = async (destination) => {
+    if (ACTIVE_STATUSES.includes(trip.status)) {
+      const confirmed = window.confirm(
+        'You have an active trip. Leaving now will be recorded as abandoning it, and repeated violations can get your account suspended. Leave anyway?'
+      )
+      if (!confirmed) return
+      await flagDisconnect()
+    }
+    router.push(destination)
   }
 
   const nextStepMap = {
@@ -302,7 +347,7 @@ export default function DriverTripPage() {
           )}
 
           <button
-            onClick={() => router.push('/history')}
+            onClick={() => leaveTripScreen('/history')}
             className="text-green-600 text-sm font-medium"
           >
             View Trip History

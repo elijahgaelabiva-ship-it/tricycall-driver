@@ -196,6 +196,21 @@ const loadPendingTrips = async () => {
     )
   }
 
+  if (driver?.is_suspended) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white px-4">
+        <div className="text-center space-y-3">
+          <h1 className="text-2xl font-bold text-red-600">Account Suspended</h1>
+          <p className="text-gray-600">
+            Hi {profile?.full_name}, your account has been suspended due to repeated
+            trips abandoned while active. Please contact TRICYCALL.SF support to
+            resolve this.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   if (!driver?.is_approved) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white px-4">

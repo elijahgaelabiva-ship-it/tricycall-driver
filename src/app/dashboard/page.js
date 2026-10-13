@@ -7,6 +7,15 @@ import { enablePush } from '@/lib/push'
 
 const ACTIVE_STATUSES = ['accepted', 'arrived', 'ongoing']
 
+function timeAgo(iso) {
+  if (!iso) return ''
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000))
+  if (seconds < 60) return 'Just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes} min ago`
+  return `${Math.floor(minutes / 60)} hr ago`
+}
+
 export default function DriverDashboardPage() {
   const [profile, setProfile] = useState(null)
   const [driver, setDriver] = useState(null)
@@ -19,6 +28,7 @@ export default function DriverDashboardPage() {
 const [skippedIds, setSkippedIds] = useState([])  
 const [accepting, setAccepting] = useState(null)
   const [pushStatus, setPushStatus] = useState(null)
+  const [today, setToday] = useState({ trips: 0, earned: 0 })
   const router = useRouter()
 
   useEffect(() => {
@@ -198,6 +208,31 @@ const loadPendingTrips = async () => {
     loadRatings()
   }, [driver?.id])
 
+  // Today's completed trips and earnings
+  useEffect(() => {
+    if (!driver?.id || !driver?.is_approved) return
+
+    const loadToday = async () => {
+      const start = new Date()
+      start.setHours(0, 0, 0, 0)
+
+      const { data } = await supabase
+        .from('trips')
+        .select('fare')
+        .eq('driver_id', driver.id)
+        .eq('status', 'completed')
+        .gte('completed_at', start.toISOString())
+
+      const rows = data || []
+      setToday({
+        trips: rows.length,
+        earned: rows.reduce((sum, t) => sum + Number(t.fare || 0), 0),
+      })
+    }
+
+    loadToday()
+  }, [driver?.id, driver?.is_approved])
+
   const handleLogout = async () => {
     setLoggingOut(true)
 
@@ -263,8 +298,14 @@ const loadPendingTrips = async () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-mist">
-        <p className="text-mute font-medium">Loading your dashboard...</p>
+      <div className="min-h-screen bg-mist" aria-busy="true">
+        <div className="mx-auto w-full max-w-md">
+          <div className="h-64 rounded-b-[28px] bg-ink" />
+          <div className="mx-4 mt-4 space-y-3 motion-safe:animate-pulse">
+            <div className="h-20 rounded-2xl bg-white" />
+            <div className="h-32 rounded-2xl bg-white" />
+          </div>
+        </div>
       </div>
     )
   }
@@ -388,10 +429,10 @@ const loadPendingTrips = async () => {
               />
             </span>
             <div>
-              <p className="text-2xl font-extrabold leading-tight">
+              <p className="text-base font-bold leading-tight">
                 {online ? "You're online" : "You're offline"}
               </p>
-              <p className="text-sm text-white/70">
+              <p className="mt-0.5 text-sm text-white/70">
                 {online
                   ? 'Passengers nearby can send you ride requests.'
                   : 'Open the app again to go back online.'}
@@ -427,17 +468,37 @@ const loadPendingTrips = async () => {
           )}
         </header>
 
+        {/* Today */}
+        <section className="mx-4 mt-4 grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-line bg-white p-4">
+            <p className="text-xs text-mute">Trips today</p>
+            <p className="mt-1 text-3xl font-extrabold tabular-nums text-ink">{today.trips}</p>
+          </div>
+          <div className="rounded-2xl border border-line bg-white p-4">
+            <p className="text-xs text-mute">Earned today</p>
+            <p className="mt-1 text-3xl font-extrabold tabular-nums text-ink">
+              ₱{today.earned.toLocaleString('en-PH', { maximumFractionDigits: 0 })}
+            </p>
+          </div>
+        </section>
+
         {/* Vehicle */}
         <section className="mx-4 mt-4 rounded-2xl border border-line bg-white p-4">
-          <div className="flex items-center justify-between gap-3">
-            <span className="rounded-md border-2 border-ink px-3 py-1 text-lg font-extrabold tracking-wider text-ink">
-              {vehicle?.plate_number || 'No plate'}
-            </span>
-            <span className="truncate text-sm font-semibold text-mute">
-              {vehicle?.model || 'Vehicle not set'}
-            </span>
+          <div className="relative mx-auto w-fit max-w-full rounded-lg border-[3px] border-ink bg-white p-1">
+            <div className="rounded-[5px] border border-ink/25 px-9 pb-1.5 pt-1 text-center">
+              <p className="text-[9px] font-bold tracking-[0.3em] text-ink/70">PHILIPPINES</p>
+              <p className="font-mono text-3xl font-black leading-tight tracking-[0.14em] text-ink">
+                {vehicle?.plate_number || 'NO PLATE'}
+              </p>
+            </div>
+            <span className="absolute left-3 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-ink/25" />
+            <span className="absolute right-3 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-ink/25" />
           </div>
-          <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
+          <p className="mt-3 text-center text-sm font-semibold text-mute">
+            {vehicle?.model || 'Vehicle model not set'}
+          </p>
+
+          <dl className="mt-4 grid grid-cols-2 gap-4 border-t border-line pt-4 text-sm">
             <div className="min-w-0">
               <dt className="text-xs text-mute">License number</dt>
               <dd className="mt-0.5 truncate font-semibold text-ink">
@@ -450,6 +511,27 @@ const loadPendingTrips = async () => {
             </div>
           </dl>
         </section>
+
+        <button
+          onClick={() => router.push('/history')}
+          className="mx-4 mt-3 flex w-[calc(100%-2rem)] items-center justify-between rounded-2xl border border-line bg-white px-4 py-3.5 text-left active:bg-mist"
+        >
+          <span className="font-semibold text-ink">Trip history</span>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-mute"
+            aria-hidden="true"
+          >
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </button>
 
         {/* Ride requests */}
         {online && (
@@ -486,6 +568,8 @@ const loadPendingTrips = async () => {
                         {Number(trip.distance_km).toFixed(2)} km trip
                       </p>
                     </div>
+
+                    <p className="mt-1 text-xs text-mute">{timeAgo(trip.requested_at)}</p>
 
                     {trip.pickup_address && (
                       <p className="mt-2 flex items-start gap-2 text-sm text-ink">

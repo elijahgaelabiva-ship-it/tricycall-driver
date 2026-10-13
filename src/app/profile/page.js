@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import LiveCamera from '@/components/LiveCamera'
+import { uploadAvatar } from '@/lib/avatar'
 
 export default function DriverProfilePage() {
   const router = useRouter()
@@ -12,6 +14,7 @@ export default function DriverProfilePage() {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
+  const [showCamera, setShowCamera] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
@@ -51,15 +54,8 @@ export default function DriverProfilePage() {
     loadData()
   }, [router])
 
-  const handlePhotoUpload = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('Photo is too large. Please choose one under 5MB.')
-      return
-    }
-
+  const handlePhoto = async (blob) => {
+    setShowCamera(false)
     setUploading(true)
     setUploadError('')
 
@@ -67,39 +63,14 @@ export default function DriverProfilePage() {
       data: { user },
     } = await supabase.auth.getUser()
 
-    const fileExt = file.name.split('.').pop()
-    const filePath = `${user.id}/avatar.${fileExt}`
-
-    const { error: uploadErr } = await supabase.storage
-      .from('avatars')
-      .upload(filePath, file, { upsert: true })
-
-    if (uploadErr) {
-      setUploadError(uploadErr.message)
+    const { url, error } = await uploadAvatar(user.id, blob)
+    if (error) {
+      setUploadError(error)
       setUploading(false)
       return
     }
 
-    const { data: publicUrlData } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(filePath)
-
-    // Cache-busting timestamp so the new photo shows immediately, since the
-    // file path itself doesn't change when re-uploading.
-    const freshUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`
-
-    const { error: updateErr } = await supabase
-      .from('profiles')
-      .update({ avatar_url: freshUrl })
-      .eq('id', user.id)
-
-    if (updateErr) {
-      setUploadError(updateErr.message)
-      setUploading(false)
-      return
-    }
-
-    setProfile((prev) => ({ ...prev, avatar_url: freshUrl }))
+    setProfile((prev) => ({ ...prev, avatar_url: url }))
     setUploading(false)
   }
 
@@ -113,6 +84,9 @@ export default function DriverProfilePage() {
 
   return (
     <div className="min-h-screen bg-white px-4 py-8 flex flex-col items-center">
+      {showCamera && (
+        <LiveCamera onCapture={handlePhoto} onCancel={() => setShowCamera(false)} />
+      )}
       <button
         onClick={() => router.push('/dashboard')}
         className="self-start text-sm text-gray-500 underline mb-4"
@@ -136,16 +110,14 @@ export default function DriverProfilePage() {
         )}
 
         <div>
-          <label className="inline-block bg-green-600 text-white rounded-xl px-4 py-2 text-sm font-semibold cursor-pointer hover:bg-green-700 transition">
-            {uploading ? 'Uploading...' : 'Change Photo'}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handlePhotoUpload}
-              disabled={uploading}
-              className="hidden"
-            />
-          </label>
+          <button
+            type="button"
+            onClick={() => setShowCamera(true)}
+            disabled={uploading}
+            className="inline-block bg-green-600 text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-green-700 transition disabled:opacity-50"
+          >
+            {uploading ? 'Uploading...' : '📷 Take New Photo'}
+          </button>
         </div>
 
         {uploadError && (

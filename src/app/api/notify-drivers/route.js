@@ -90,7 +90,10 @@ export async function POST(request) {
   await Promise.all(
     (subs || []).map(async (s) => {
       try {
-        await webpush.sendNotification(s.subscription, message)
+        await webpush.sendNotification(s.subscription, message, {
+          urgency: 'high', // wake the phone even in battery-saving mode
+          TTL: 60, // a ride request is useless after a minute, so don't deliver it late
+        })
         sent++
       } catch (err) {
         // Subscription expired or was revoked: remove it

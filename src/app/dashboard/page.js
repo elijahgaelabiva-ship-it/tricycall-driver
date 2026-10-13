@@ -69,12 +69,21 @@ const [accepting, setAccepting] = useState(null)
       // No Online/Offline button: a logged-in, approved driver is online.
       // (Logging out sets them offline.)
       let currentDriver = driverData
-      if (driverData?.is_approved && !driverData.is_suspended && !driverData.is_online) {
-        const { error: onlineError } = await supabase
+      if (driverData?.is_approved && !driverData.is_suspended) {
+        if (!driverData.is_online) {
+          const { error: onlineError } = await supabase
+            .from('drivers')
+            .update({ is_online: true })
+            .eq('id', user.id)
+          if (!onlineError) currentDriver = { ...driverData, is_online: true }
+        }
+
+        // Opening the app counts as "I'm still here" for the availability check.
+        // Best effort: ignore errors so the dashboard still works if this fails.
+        await supabase
           .from('drivers')
-          .update({ is_online: true })
+          .update({ last_active_at: new Date().toISOString(), availability_check_sent_at: null })
           .eq('id', user.id)
-        if (!onlineError) currentDriver = { ...driverData, is_online: true }
       }
 
       setProfile(profileData)

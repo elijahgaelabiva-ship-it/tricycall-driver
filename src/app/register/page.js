@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import LiveCamera from '@/components/LiveCamera'
+import { uploadAvatar } from '@/lib/avatar'
 import { normalizePhone, isValidPhone, phoneToAuthEmail } from '@/lib/phone'
 
 export default function DriverRegisterPage() {
@@ -14,6 +16,8 @@ export default function DriverRegisterPage() {
   const [vehicleModel, setVehicleModel] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showCamera, setShowCamera] = useState(false)
+  const [photo, setPhoto] = useState(null) // { blob, url }
   const router = useRouter()
 
   const handleRegister = async (e) => {
@@ -24,6 +28,11 @@ export default function DriverRegisterPage() {
 
     if (!isValidPhone(normalizedPhone)) {
       setError('Please enter a valid PH mobile number (e.g. 09171234567).')
+      return
+    }
+
+    if (!photo) {
+      setError('Please take your photo with the camera.')
       return
     }
 
@@ -65,6 +74,11 @@ export default function DriverRegisterPage() {
       return
     }
 
+    // Save the live camera photo. If this fails the account is still created
+    // and the driver can retake it later from their profile page.
+    const { error: photoError } = await uploadAvatar(userId, photo.blob)
+    if (photoError) console.log('Photo upload error:', photoError)
+
     const { error: driverError } = await supabase.from('drivers').insert({
       id: userId,
       license_number: licenseNumber,
@@ -95,6 +109,15 @@ export default function DriverRegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white px-4 py-8">
+      {showCamera && (
+        <LiveCamera
+          onCapture={(blob) => {
+            setPhoto({ blob, url: URL.createObjectURL(blob) })
+            setShowCamera(false)
+          }}
+          onCancel={() => setShowCamera(false)}
+        />
+      )}
       <form
         onSubmit={handleRegister}
         className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-8 space-y-4"
@@ -109,6 +132,30 @@ export default function DriverRegisterPage() {
             {error}
           </p>
         )}
+
+        <div className="flex flex-col items-center gap-2">
+          {photo ? (
+            <img
+              src={photo.url}
+              alt="Your photo"
+              className="w-28 h-28 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-28 h-28 rounded-full bg-green-100 flex items-center justify-center text-4xl">
+              📷
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowCamera(true)}
+            className="text-sm font-semibold text-green-700 underline"
+          >
+            {photo ? 'Retake photo' : 'Take your photo (required)'}
+          </button>
+          <p className="text-xs text-gray-400 text-center">
+            Photos are taken live with the camera. Gallery uploads are not allowed.
+          </p>
+        </div>
 
         <input
           type="text"

@@ -18,16 +18,29 @@ export default function DriverLoginPage() {
   // back here with ?from=intro), which prevents an infinite redirect loop
   // while still showing the intro on every fresh visit to the app.
   useEffect(() => {
-    const fromIntro =
-      typeof window !== 'undefined' &&
-      new URLSearchParams(window.location.search).get('from') === 'intro'
+    const init = async () => {
+      // Already logged in (session saved on this phone)? Skip login and intro
+      // and go straight to the dashboard.
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
 
-    if (!fromIntro) {
-      window.location.href = '/intro.html'
-      return
+      if (session) {
+        router.replace('/dashboard')
+        return
+      }
+
+      const fromIntro = new URLSearchParams(window.location.search).get('from') === 'intro'
+
+      if (!fromIntro) {
+        window.location.href = '/intro.html'
+        return
+      }
+      setCheckingIntro(false)
     }
-    setCheckingIntro(false)
-  }, [])
+
+    init()
+  }, [router])
 
   const handleLogin = async (e) => {
     e.preventDefault()

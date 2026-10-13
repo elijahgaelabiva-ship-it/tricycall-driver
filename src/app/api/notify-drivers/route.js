@@ -43,18 +43,22 @@ export async function POST(request) {
   )
 
   // Online drivers with a known location
-  const { data: drivers } = await supabase
+  const debug = {}
+  const { data: drivers, error: driversError } = await supabase
     .from('drivers')
     .select('id, current_lat, current_lng')
     .eq('is_online', true)
     .not('current_lat', 'is', null)
     .not('current_lng', 'is', null)
+  if (driversError) debug.driversError = driversError.message
+  debug.onlineDrivers = (drivers || []).length
 
   // Drivers already busy with an unfinished trip are skipped
-  const { data: busy } = await supabase
+  const { data: busy, error: busyError } = await supabase
     .from('trips')
     .select('driver_id')
     .in('status', ['accepted', 'arrived', 'ongoing'])
+  if (busyError) debug.busyError = busyError.message
   const busyIds = new Set((busy || []).map((t) => t.driver_id))
 
   const nearby = (drivers || []).filter(
@@ -62,12 +66,16 @@ export async function POST(request) {
       !busyIds.has(d.id) &&
       distanceKm(d.current_lat, d.current_lng, trip.pickup_lat, trip.pickup_lng) <= RADIUS_KM
   )
-  if (nearby.length === 0) return Response.json({ notified: 0 })
+  debug.nearby = nearby.length
+  if (nearby.length === 0) return Response.json({ notified: 0, debug })
 
-  const { data: subs } = await supabase
+  const { data: subs, error: subsError } = await supabase
     .from('push_subscriptions')
     .select('endpoint, subscription')
     .in('driver_id', nearby.map((d) => d.id))
+  if (subsError) debug.subsError = subsError.message
+  debug.subscriptions = (subs || []).length
+  debug.sendErrors = []
 
   const message = JSON.stringify({
     title: 'New ride request',
@@ -87,13 +95,15 @@ export async function POST(request) {
       } catch (err) {
         // Subscription expired or was revoked: remove it
         if (err.statusCode === 404 || err.statusCode === 410) {
+          debug.sendErrors.push(`${err.statusCode}: subscription expired, removed`)
           await supabase.from('push_subscriptions').delete().eq('endpoint', s.endpoint)
         } else {
           console.log('Push error:', err.statusCode, err.body)
+          debug.sendErrors.push(`${err.statusCode || 'ERR'}: ${String(err.body || err.message).slice(0, 120)}`)
         }
       }
     })
   )
 
-  return Response.json({ notified: sent })
+  return Response.json({ notified: sent, debug })
 }

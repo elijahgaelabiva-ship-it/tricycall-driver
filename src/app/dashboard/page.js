@@ -18,6 +18,7 @@ export default function DriverDashboardPage() {
   const [pendingTrips, setPendingTrips] = useState([])
 const [skippedIds, setSkippedIds] = useState([])  
 const [accepting, setAccepting] = useState(null)
+  const [pushStatus, setPushStatus] = useState(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -126,7 +127,7 @@ const [accepting, setAccepting] = useState(null)
   // (only if permission was already granted, so no surprise prompts)
   useEffect(() => {
     if (driver?.is_online && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      enablePush(driver.id)
+      enablePush(driver.id).then(setPushStatus)
     }
   }, [driver?.is_online, driver?.id])
 
@@ -190,7 +191,7 @@ const loadPendingTrips = async () => {
     if (!error) {
       setDriver({ ...driver, is_online: newStatus })
       // Going online: ask for notification permission and register this device
-      if (newStatus) enablePush(driver.id)
+      if (newStatus) setPushStatus(await enablePush(driver.id))
     }
 
     setToggling(false)
@@ -340,6 +341,26 @@ const loadPendingTrips = async () => {
           </button>
         </div>
       </div>
+
+      {driver.is_online && (
+        <div className="w-full max-w-sm mb-3">
+          {pushStatus?.ok ? (
+            <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+              🔔 {pushStatus.message}
+            </p>
+          ) : (
+            <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <p>🔕 {pushStatus?.message || 'Notifications are not set up on this phone yet.'}</p>
+              <button
+                onClick={async () => setPushStatus(await enablePush(driver.id))}
+                className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 font-semibold text-white"
+              >
+                Turn on notifications
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {driver.is_online && (
         <div className="w-full max-w-sm flex-1">

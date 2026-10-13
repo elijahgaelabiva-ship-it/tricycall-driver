@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
+const ACTIVE_STATUSES = ['accepted', 'arrived', 'ongoing']
+
 export default function DriverDashboardPage() {
   const [profile, setProfile] = useState(null)
   const [driver, setDriver] = useState(null)
@@ -45,6 +47,22 @@ const [accepting, setAccepting] = useState(null)
         .select('*')
         .eq('driver_id', user.id)
         .maybeSingle()
+
+      // If the driver still has an unfinished trip (e.g. they closed the app
+      // without tapping "Complete Trip"), send them back to it.
+      const { data: activeTrip } = await supabase
+        .from('trips')
+        .select('id')
+        .eq('driver_id', user.id)
+        .in('status', ACTIVE_STATUSES)
+        .order('requested_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (activeTrip) {
+        router.replace(`/trip/${activeTrip.id}`)
+        return
+      }
 
       setProfile(profileData)
       setDriver(driverData)
@@ -169,6 +187,21 @@ const loadPendingTrips = async () => {
 
   const acceptTrip = async (tripId) => {
     setAccepting(tripId)
+
+    // Don't let a driver take a new trip while another is still unfinished.
+    const { data: existing } = await supabase
+      .from('trips')
+      .select('id')
+      .eq('driver_id', driver.id)
+      .in('status', ACTIVE_STATUSES)
+      .limit(1)
+      .maybeSingle()
+
+    if (existing) {
+      setAccepting(null)
+      router.push(`/trip/${existing.id}`)
+      return
+    }
 
     const { error } = await supabase
       .from('trips')

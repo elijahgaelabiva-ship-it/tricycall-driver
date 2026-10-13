@@ -14,7 +14,7 @@ export default function DriverDashboardPage() {
   const [avgRating, setAvgRating] = useState(null)
   const [ratingCount, setRatingCount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [toggling, setToggling] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
   const [pendingTrips, setPendingTrips] = useState([])
 const [skippedIds, setSkippedIds] = useState([])  
 const [accepting, setAccepting] = useState(null)
@@ -66,8 +66,19 @@ const [accepting, setAccepting] = useState(null)
         return
       }
 
+      // No Online/Offline button: a logged-in, approved driver is online.
+      // (Logging out sets them offline.)
+      let currentDriver = driverData
+      if (driverData?.is_approved && !driverData.is_suspended && !driverData.is_online) {
+        const { error: onlineError } = await supabase
+          .from('drivers')
+          .update({ is_online: true })
+          .eq('id', user.id)
+        if (!onlineError) currentDriver = { ...driverData, is_online: true }
+      }
+
       setProfile(profileData)
-      setDriver(driverData)
+      setDriver(currentDriver)
       setVehicle(vehicleData)
       setLoading(false)
     }
@@ -178,23 +189,31 @@ const loadPendingTrips = async () => {
     loadRatings()
   }, [driver?.id])
 
-  const toggleOnline = async () => {
-    setToggling(true)
+  const handleLogout = async () => {
+    setLoggingOut(true)
 
-    const newStatus = !driver.is_online
+    try {
+      // Remove this phone's notification registration so a logged-out phone
+      // stops receiving ride requests.
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration('/sw.js')
+        const subscription = await registration?.pushManager.getSubscription()
+        if (subscription) {
+          await supabase.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint)
+          await subscription.unsubscribe()
+        }
+      }
 
-    const { error } = await supabase
-      .from('drivers')
-      .update({ is_online: newStatus })
-      .eq('id', driver.id)
-
-    if (!error) {
-      setDriver({ ...driver, is_online: newStatus })
-      // Going online: ask for notification permission and register this device
-      if (newStatus) setPushStatus(await enablePush(driver.id))
+      // Go offline so passengers/requests no longer reach this driver
+      if (driver?.id) {
+        await supabase.from('drivers').update({ is_online: false }).eq('id', driver.id)
+      }
+    } catch (err) {
+      console.log('Logout cleanup error:', err)
     }
 
-    setToggling(false)
+    await supabase.auth.signOut()
+    router.replace('/login')
   }
 
   const acceptTrip = async (tripId) => {
@@ -328,16 +347,12 @@ const loadPendingTrips = async () => {
           <button
             onClick={(e) => {
               e.stopPropagation()
-              toggleOnline()
+              handleLogout()
             }}
-            disabled={toggling}
-            className={`flex-shrink-0 rounded-xl px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-50 ${
-              driver.is_online
-                ? 'bg-gray-400 hover:bg-gray-500'
-                : 'bg-green-600 hover:bg-green-700'
-            }`}
+            disabled={loggingOut}
+            className="flex-shrink-0 rounded-xl px-4 py-2 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition disabled:opacity-50"
           >
-            {toggling ? '...' : driver.is_online ? 'Go Offline' : 'Go Online'}
+            {loggingOut ? 'Logging out...' : 'Log out'}
           </button>
         </div>
       </div>

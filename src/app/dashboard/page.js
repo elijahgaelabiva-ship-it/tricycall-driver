@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { enablePush } from '@/lib/push'
 
 const ACTIVE_STATUSES = ['accepted', 'arrived', 'ongoing']
 
@@ -121,6 +122,14 @@ const [accepting, setAccepting] = useState(null)
     return () => navigator.geolocation.clearWatch(watchId)
   }, [driver?.is_online, driver?.id])
 
+  // Re-register this device for push whenever the dashboard opens while online
+  // (only if permission was already granted, so no surprise prompts)
+  useEffect(() => {
+    if (driver?.is_online && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      enablePush(driver.id)
+    }
+  }, [driver?.is_online, driver?.id])
+
   // Load pending trip requests while online
   useEffect(() => {
     if (!driver?.is_online) {
@@ -180,6 +189,8 @@ const loadPendingTrips = async () => {
 
     if (!error) {
       setDriver({ ...driver, is_online: newStatus })
+      // Going online: ask for notification permission and register this device
+      if (newStatus) enablePush(driver.id)
     }
 
     setToggling(false)

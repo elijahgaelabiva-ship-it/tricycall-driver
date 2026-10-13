@@ -17,17 +17,33 @@ export function pushSupported() {
 }
 
 // Asks permission (if needed), subscribes this device, and saves the
-// subscription so the server can push to it. Returns 'granted' | 'denied' | 'unsupported' | 'error'.
-// Call it from a tap (e.g. going Online) so the browser allows the permission prompt.
+// subscription so the server can push to it.
+// Always returns { ok: boolean, message: string } so the UI can show what happened.
+// Call it from a tap so the browser allows the permission prompt.
 export async function enablePush(driverId) {
   try {
-    if (!pushSupported()) return 'unsupported'
+    if (!pushSupported()) {
+      return { ok: false, message: 'This browser does not support push notifications.' }
+    }
+
+    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    if (!vapidKey) {
+      return { ok: false, message: 'Missing VAPID public key in the app build.' }
+    }
 
     const permission =
       Notification.permission === 'default'
         ? await Notification.requestPermission()
         : Notification.permission
-    if (permission !== 'granted') return permission
+    if (permission !== 'granted') {
+      return {
+        ok: false,
+        message:
+          permission === 'denied'
+            ? 'Notifications are blocked. Tap the lock icon by the address, open Permissions, and set Notifications to Allow.'
+            : 'Notification permission was not given.',
+      }
+    }
 
     const registration = await navigator.serviceWorker.register('/sw.js')
     await navigator.serviceWorker.ready
@@ -36,7 +52,7 @@ export async function enablePush(driverId) {
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY),
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
       })
     }
 
@@ -46,12 +62,10 @@ export async function enablePush(driverId) {
       subscription: subscription.toJSON(),
     })
     if (error) {
-      console.log('Save subscription error:', error)
-      return 'error'
+      return { ok: false, message: `Could not save subscription: ${error.message}` }
     }
-    return 'granted'
+    return { ok: true, message: 'Notifications are on for this phone.' }
   } catch (err) {
-    console.log('Push setup error:', err)
-    return 'error'
+    return { ok: false, message: `Push setup failed: ${err?.name || 'Error'} - ${err?.message || err}` }
   }
 }

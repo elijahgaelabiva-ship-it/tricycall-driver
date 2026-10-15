@@ -1,7 +1,14 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  ZoomControl,
+  AttributionControl,
+  useMap,
+} from 'react-leaflet'
 import L from 'leaflet'
 
 const destinationIcon = new L.Icon({
@@ -490,8 +497,12 @@ export default function MapView({ driverLocation, targetLocation, targetIsPassen
       <MapContainer
         center={[mapCenter.lat, mapCenter.lng]}
         zoom={15}
+        zoomControl={false}
+        attributionControl={false}
         style={{ height: '100%', width: '100%' }}
       >
+        <ZoomControl position="bottomright" />
+        <AttributionControl position="bottomleft" prefix={false} />
         <ResilientTileLayer />
         {driverLocation && <DriverMarker location={driverLocation} />}
         {targetLocation && (

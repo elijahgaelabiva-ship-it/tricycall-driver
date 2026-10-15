@@ -193,20 +193,32 @@ export default function DriverTripPage() {
   }
 
   const nextStepMap = {
-    accepted: { label: 'I Have Arrived', next: 'arrived' },
-    arrived: { label: 'Start Trip', next: 'ongoing' },
-    ongoing: { label: 'Complete Trip', next: 'completed' },
+    accepted: { label: "I've arrived", next: 'arrived' },
+    arrived: { label: 'Start trip', next: 'ongoing' },
+    ongoing: { label: 'Complete trip', next: 'completed' },
+  }
+
+  const statusMessages = {
+    accepted: { title: 'Head to the pickup', sub: 'Your passenger is waiting for you.' },
+    arrived: { title: 'Waiting for passenger', sub: "Start the trip once they're on board." },
+    ongoing: { title: 'Trip in progress', sub: 'Take your passenger to the drop-off point.' },
+    completed: { title: 'Trip completed', sub: 'Nice work!' },
+    cancelled: { title: 'Trip cancelled', sub: 'This ride was cancelled.' },
   }
 
   if (!trip) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <p className="text-gray-500">Loading...</p>
+      <div className="min-h-screen bg-mist" aria-busy="true">
+        <div className="mx-auto w-full max-w-md">
+          <div className="h-48 rounded-b-[28px] bg-ink" />
+          <div className="mx-4 mt-4 h-64 rounded-2xl bg-white motion-safe:animate-pulse" />
+        </div>
       </div>
     )
   }
 
   const step = nextStepMap[trip.status]
+  const message = statusMessages[trip.status] || { title: `Trip ${trip.status}`, sub: '' }
 
   // Show the pickup point while heading to/waiting for the passenger,
   // switch to the dropoff point once the trip is ongoing.
@@ -219,95 +231,145 @@ export default function DriverTripPage() {
   const showPassengerCard = passenger && !['completed', 'cancelled'].includes(trip.status)
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
-      <div className="text-center px-4 pt-8 pb-4">
-        <h1 className="text-2xl font-bold text-green-600 capitalize">
-          Trip {trip.status}
-        </h1>
+    <div className="mx-auto flex h-dvh w-full max-w-md flex-col overflow-hidden bg-mist">
+      {/* Status header */}
+      <header className="shrink-0 rounded-b-[28px] bg-ink px-5 pb-5 pt-[max(1rem,env(safe-area-inset-top))] text-white">
+        <span className="text-sm font-bold text-white/80">TRICYCALL.SF</span>
 
-        <div className="text-gray-700 mt-1">
-          <p>Fare: ₱{Number(trip.fare).toFixed(2)}</p>
-          <p>Distance: {Number(trip.distance_km).toFixed(2)} km</p>
-        </div>
-      </div>
+        <h1 className="mt-4 text-2xl font-extrabold leading-tight">{message.title}</h1>
+        <p className="mt-1 text-sm text-white/70">{message.sub}</p>
 
-      {showPassengerCard && (
-        <div className="mx-4 mb-2 p-4 bg-green-50 rounded-xl flex items-center justify-between">
+        <div className="mt-4 flex items-end justify-between gap-3">
           <div>
-            <p className="text-xs text-gray-500">Passenger</p>
-            <p className="font-semibold text-gray-800">{passenger.full_name}</p>
-            <p className="text-sm text-gray-600">{passenger.phone}</p>
+            <p className="text-xs text-white/60">Fare</p>
+            <p className="text-3xl font-extrabold tabular-nums">
+              ₱{Number(trip.fare).toFixed(2)}
+            </p>
           </div>
-          <a
-            href={`tel:${passenger.phone}`}
-            className="bg-green-600 text-white rounded-full px-4 py-2 text-sm font-semibold"
-          >
-            Call
-          </a>
+          <div className="text-right">
+            <p className="text-xs text-white/60">Distance</p>
+            <p className="text-lg font-bold tabular-nums">
+              {Number(trip.distance_km).toFixed(2)} km
+            </p>
+          </div>
         </div>
-      )}
+      </header>
 
-      {passengerError && !showPassengerCard && (
-        <p className="text-center text-xs text-red-500 px-4 mb-2">
-          Could not load passenger contact: {passengerError}
-        </p>
-      )}
-
-      {showMap && (
-	<div className="rounded-2xl overflow-hidden" style={{ height: '350px', width: '100%', position: 'relative' }}>
-          <MapView
-            driverLocation={driverLocation}
-            targetLocation={targetLocation}
-            targetIsPassenger={trip.status !== 'ongoing'}
-          />
+      {showMap ? (
+        <div className="relative min-h-0 flex-1 [&_.leaflet-bottom]:mb-6">
+          <div className="absolute inset-0">
+            <MapView
+              driverLocation={driverLocation}
+              targetLocation={targetLocation}
+              targetIsPassenger={trip.status !== 'ongoing'}
+            />
+          </div>
         </div>
+      ) : (
+        <main className="min-h-0 flex-1 overflow-y-auto px-4 pt-5">
+          <div className="rounded-2xl border border-line bg-white p-5 text-center">
+            {trip.status === 'completed' ? (
+              <>
+                <p className="text-xs text-mute">You earned</p>
+                <p className="text-4xl font-extrabold tabular-nums text-ink">
+                  ₱{Number(trip.fare).toFixed(2)}
+                </p>
+                <p className="mt-2 text-sm text-mute">This trip is complete. Nice work!</p>
+              </>
+            ) : (
+              <>
+                <p className="font-bold text-ink">This trip was cancelled</p>
+                <p className="mt-1 text-sm text-mute">
+                  You'll be notified when another request comes in.
+                </p>
+              </>
+            )}
+          </div>
+        </main>
       )}
 
-      <div className="flex-1 flex items-center justify-center px-4 py-6">
-        <div className="text-center space-y-4 w-full max-w-sm">
-          {step && (
-            <button
-              onClick={() => updateStatus(step.next)}
-              disabled={updating}
-              className="w-full bg-green-600 text-white rounded-xl py-3 font-semibold hover:bg-green-700 transition disabled:opacity-50"
+      {/* Bottom sheet */}
+      <div
+        className="relative shrink-0 rounded-t-[28px] bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5 shadow-[0_-8px_24px_rgba(23,33,43,0.12)]"
+        style={{ zIndex: 1100, marginTop: showMap ? '-1.5rem' : 0 }}
+      >
+        {showPassengerCard && (
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-mist text-lg font-bold text-ink">
+              {passenger.full_name?.charAt(0).toUpperCase() || '?'}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-mute">Passenger</p>
+              <p className="truncate font-bold text-ink">{passenger.full_name}</p>
+              <p className="text-sm text-mute">{passenger.phone}</p>
+            </div>
+            <a
+              href={`tel:${passenger.phone}`}
+              className="flex h-11 shrink-0 items-center gap-2 rounded-xl bg-ink px-4 text-sm font-bold text-white active:bg-ink/90"
             >
-              {updating ? 'Updating...' : step.label}
-            </button>
-          )}
-
-          {trip.status === 'arrived' && (
-            <button
-              onClick={reportNoShow}
-              disabled={reportingNoShow}
-              className="w-full bg-red-100 text-red-600 rounded-xl py-3 font-semibold hover:bg-red-200 transition disabled:opacity-50"
-            >
-              {reportingNoShow ? 'Reporting...' : 'Passenger No-Show'}
-            </button>
-          )}
-
-          {noShowError && (
-            <p className="text-red-600 text-sm">{noShowError}</p>
-          )}
-
-          {trip.status === 'completed' && (
-            <>
-              <p className="text-gray-500">This trip is complete. Nice work!</p>
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="w-full bg-green-600 text-white rounded-xl py-3 font-semibold hover:bg-green-700 transition"
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
               >
-                Back to Dashboard
-              </button>
-            </>
-          )}
+                <path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.5 2.1L8 9.9a16 16 0 006 6l1.3-1.3a2 2 0 012.1-.4c.9.3 1.8.6 2.8.7a2 2 0 011.7 2z" />
+              </svg>
+              Call
+            </a>
+          </div>
+        )}
 
+        {passengerError && !showPassengerCard && (
+          <p className="text-xs text-red-600">
+            Could not load passenger contact: {passengerError}
+          </p>
+        )}
+
+        {step && (
           <button
-            onClick={() => router.push('/history')}
-            className="text-green-600 text-sm font-medium"
+            onClick={() => updateStatus(step.next)}
+            disabled={updating}
+            className={`h-14 w-full rounded-2xl bg-signal text-base font-bold text-ink active:bg-signal-dark disabled:opacity-60 ${
+              showPassengerCard ? 'mt-4' : ''
+            }`}
           >
-            View Trip History
+            {updating ? 'Updating...' : step.label}
           </button>
-        </div>
+        )}
+
+        {trip.status === 'arrived' && (
+          <button
+            onClick={reportNoShow}
+            disabled={reportingNoShow}
+            className="mt-2 h-12 w-full rounded-2xl border border-red-200 font-semibold text-red-600 active:bg-red-50 disabled:opacity-50"
+          >
+            {reportingNoShow ? 'Reporting...' : 'Passenger no-show'}
+          </button>
+        )}
+
+        {noShowError && <p className="mt-2 text-sm text-red-600">{noShowError}</p>}
+
+        {['completed', 'cancelled'].includes(trip.status) && (
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="h-14 w-full rounded-2xl bg-signal text-base font-bold text-ink active:bg-signal-dark"
+          >
+            Back to dashboard
+          </button>
+        )}
+
+        <button
+          onClick={() => router.push('/history')}
+          className="mt-2 h-10 w-full rounded-xl text-sm font-semibold text-mute active:bg-mist"
+        >
+          View trip history
+        </button>
       </div>
     </div>
   )

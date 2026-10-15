@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import LiveCamera from '@/components/LiveCamera'
 import { uploadAvatar } from '@/lib/avatar'
 import { normalizePhone, isValidPhone, phoneToAuthEmail } from '@/lib/phone'
+import AuthShell, { inputClass, labelClass } from '@/components/AuthShell'
 
 export default function DriverRegisterPage() {
   const [fullName, setFullName] = useState('')
@@ -108,7 +109,7 @@ export default function DriverRegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white px-4 py-8">
+    <AuthShell title="Become a driver" subtitle="Register your tricycle and start earning.">
       {showCamera && (
         <LiveCamera
           onCapture={(blob) => {
@@ -118,115 +119,161 @@ export default function DriverRegisterPage() {
           onCancel={() => setShowCamera(false)}
         />
       )}
-      <form
-        onSubmit={handleRegister}
-        className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-8 space-y-4"
-      >
-        <h1 className="text-2xl font-bold text-center text-green-600">
-          Driver Registration
-        </h1>
-        <p className="text-center text-gray-500 text-sm">TRICYCALL.SF</p>
 
+      <form onSubmit={handleRegister} className="space-y-4">
         {error && (
-          <p className="text-red-600 text-sm text-center bg-red-50 p-2 rounded">
-            {error}
-          </p>
+          <p className="rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700">{error}</p>
         )}
 
         <div className="flex flex-col items-center gap-2">
           {photo ? (
-            <img
-              src={photo.url}
-              alt="Your photo"
-              className="w-28 h-28 rounded-full object-cover"
-            />
+            <img src={photo.url} alt="Your photo" className="h-24 w-24 rounded-full object-cover" />
           ) : (
-            <div className="w-28 h-28 rounded-full bg-green-100 flex items-center justify-center text-4xl">
-              📷
+            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-mist text-mute">
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+                <circle cx="12" cy="13" r="3.5" />
+              </svg>
             </div>
           )}
           <button
             type="button"
             onClick={() => setShowCamera(true)}
-            className="text-sm font-semibold text-green-700 underline"
+            className="h-10 rounded-xl px-4 text-sm font-bold text-ink underline underline-offset-2 active:bg-mist"
           >
             {photo ? 'Retake photo' : 'Take your photo (required)'}
           </button>
-          <p className="text-xs text-gray-400 text-center">
-            Photos are taken live with the camera. Gallery uploads are not allowed.
+          <p className="text-center text-xs text-mute">
+            Your photo is taken with the camera. Gallery uploads aren't allowed.
           </p>
         </div>
 
-        <input
-          type="text"
-          placeholder="Full Name"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          required
-          className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
-        />
+        <div>
+          <label htmlFor="fullName" className={labelClass}>
+            Full name
+          </label>
+          <input
+            id="fullName"
+            type="text"
+            placeholder="Juan Dela Cruz"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            required
+            autoComplete="name"
+            className={inputClass}
+          />
+        </div>
 
-        <input
-          type="tel"
-          placeholder="Phone Number (e.g. 09171234567)"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          required
-          className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
-        />
+        <div>
+          <label htmlFor="phone" className={labelClass}>
+            Phone number
+          </label>
+          <input
+            id="phone"
+            type="tel"
+            placeholder="09171234567"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            required
+            inputMode="tel"
+            autoComplete="tel"
+            className={inputClass}
+          />
+        </div>
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          minLength={6}
-          className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
-        />
+        <div>
+          <label htmlFor="password" className={labelClass}>
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            placeholder="At least 6 characters"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={6}
+            className={inputClass}
+          />
+        </div>
 
-        <input
-          type="text"
-          placeholder="Driver's License Number"
-          value={licenseNumber}
-          onChange={(e) => setLicenseNumber(e.target.value)}
-          required
-          className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
-        />
+        <div className="border-t border-line pt-4">
+          <p className="text-sm font-extrabold text-ink">Your documents and tricycle</p>
+          <p className="mt-0.5 text-xs text-mute">An admin reviews these before you can go online.</p>
+        </div>
 
-        <input
-          type="text"
-          placeholder="Tricycle Plate Number"
-          value={plateNumber}
-          onChange={(e) => setPlateNumber(e.target.value)}
-          required
-          className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
-        />
+        <div>
+          <label htmlFor="license" className={labelClass}>
+            Driver's license number
+          </label>
+          <input
+            id="license"
+            type="text"
+            placeholder="Your license number"
+            value={licenseNumber}
+            onChange={(e) => setLicenseNumber(e.target.value)}
+            required
+            className={inputClass}
+          />
+        </div>
 
-        <input
-          type="text"
-          placeholder="Tricycle Model/Color"
-          value={vehicleModel}
-          onChange={(e) => setVehicleModel(e.target.value)}
-          required
-          className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
-        />
+        <div>
+          <label htmlFor="plate" className={labelClass}>
+            Tricycle plate number
+          </label>
+          <input
+            id="plate"
+            type="text"
+            placeholder="ABC1234"
+            value={plateNumber}
+            onChange={(e) => setPlateNumber(e.target.value)}
+            required
+            autoCapitalize="characters"
+            className={inputClass}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="model" className={labelClass}>
+            Tricycle model and color
+          </label>
+          <input
+            id="model"
+            type="text"
+            placeholder="e.g. Honda TMX, green"
+            value={vehicleModel}
+            onChange={(e) => setVehicleModel(e.target.value)}
+            required
+            className={inputClass}
+          />
+        </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-green-600 text-white rounded-xl py-3 font-semibold hover:bg-green-700 transition disabled:opacity-50"
+          className="h-14 w-full rounded-2xl bg-signal text-base font-bold text-ink active:bg-signal-dark disabled:opacity-50"
         >
-          {loading ? 'Registering...' : 'Register as Driver'}
+          {loading ? 'Registering...' : 'Register as driver'}
         </button>
 
-        <p className="text-center text-sm text-gray-500">
+        <p className="text-center text-sm text-mute">
           Already have an account?{' '}
-          <a href="/login" className="text-green-600 font-medium">
-            Login
+          <a href="/login" className="font-bold text-ink underline underline-offset-2">
+            Log in
           </a>
         </p>
       </form>
-    </div>
+    </AuthShell>
   )
 }

@@ -28,6 +28,14 @@ export default function DriverDashboardPage() {
 const [skippedIds, setSkippedIds] = useState([])  
 const [accepting, setAccepting] = useState(null)
   const [pushStatus, setPushStatus] = useState(null)
+  const [subscription, setSubscription] = useState({
+    required: false,
+    active: true,
+    paidUntil: null,
+    daysLeft: null,
+    fee: 0,
+    instructions: '',
+  })
   const [today, setToday] = useState({ trips: 0, earned: 0 })
   const router = useRouter()
 
@@ -76,26 +84,65 @@ const [accepting, setAccepting] = useState(null)
         return
       }
 
+      // Monthly subscription (only enforced once the admin turns it on)
+      const sub = {
+        required: false,
+        active: true,
+        paidUntil: driverData?.paid_until || null,
+        daysLeft: null,
+        fee: 0,
+        instructions: '',
+      }
+
+      if (driverData?.is_approved) {
+        const [settingsRes, activeRes] = await Promise.all([
+          supabase.from('subscription_settings').select('*').eq('id', 1).maybeSingle(),
+          supabase.rpc('driver_subscription_active', { p_driver: user.id }),
+        ])
+
+        if (settingsRes.data) {
+          sub.required = settingsRes.data.required
+          sub.fee = Number(settingsRes.data.monthly_fee || 0)
+          sub.instructions = settingsRes.data.payment_instructions || ''
+        }
+        // If the subscription feature isn't set up yet, treat everyone as active
+        if (!activeRes.error && activeRes.data === false) sub.active = false
+
+        if (sub.required && sub.paidUntil) {
+          const todayManila = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
+          sub.daysLeft = Math.round((Date.parse(sub.paidUntil) - Date.parse(todayManila)) / 86400000)
+        }
+      }
+
       // No Online/Offline button: a logged-in, approved driver is online.
       // (Logging out sets them offline.)
       let currentDriver = driverData
       if (driverData?.is_approved && !driverData.is_suspended) {
-        if (!driverData.is_online) {
-          const { error: onlineError } = await supabase
-            .from('drivers')
-            .update({ is_online: true })
-            .eq('id', user.id)
-          if (!onlineError) currentDriver = { ...driverData, is_online: true }
-        }
+        if (!sub.active) {
+          // Expired subscription: not online, no requests
+          if (driverData.is_online) {
+            await supabase.from('drivers').update({ is_online: false }).eq('id', user.id)
+          }
+          currentDriver = { ...driverData, is_online: false }
+        } else {
+          if (!driverData.is_online) {
+            const { error: onlineError } = await supabase
+              .from('drivers')
+              .update({ is_online: true })
+              .eq('id', user.id)
+            if (!onlineError) currentDriver = { ...driverData, is_online: true }
+          }
 
-        // Opening the app counts as "I'm still here" for the availability check.
-        // Best effort: ignore errors so the dashboard still works if this fails.
-        await supabase
-          .from('drivers')
-          .update({ last_active_at: new Date().toISOString(), availability_check_sent_at: null })
-          .eq('id', user.id)
+          // Opening the app counts as "I'm still here" for the availability check.
+          // Best effort: ignore errors so the dashboard still works if this fails.
+          await supabase
+            .from('drivers')
+            .update({ last_active_at: new Date().toISOString(), availability_check_sent_at: null })
+            .eq('id', user.id)
+        }
       }
 
+      setSubscription(sub)
       setProfile(profileData)
       setDriver(currentDriver)
       setVehicle(vehicleData)
@@ -352,6 +399,61 @@ const loadPendingTrips = async () => {
     )
   }
 
+  if (!subscription.active) {
+    const endedOn = subscription.paidUntil
+      ? new Date(`${subscription.paidUntil}T00:00:00`).toLocaleDateString('en-PH', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric',
+        })
+      : null
+
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-mist px-6">
+        <div className="w-full max-w-sm bg-white rounded-2xl border border-line p-6 text-center">
+          <h1 className="text-xl font-extrabold text-ink">Subscription expired</h1>
+          <p className="mt-2 text-sm text-mute leading-relaxed">
+            Hi {profile?.full_name},{' '}
+            {endedOn
+              ? `your monthly subscription ended on ${endedOn}.`
+              : "you don't have an active monthly subscription yet."}{' '}
+            Renew it to receive ride requests again.
+          </p>
+
+          {subscription.fee > 0 && (
+            <p className="mt-4 text-sm text-mute">
+              Monthly fee
+              <span className="block text-3xl font-extrabold tabular-nums text-ink">
+                ₱{subscription.fee.toLocaleString('en-PH', { maximumFractionDigits: 2 })}
+              </span>
+            </p>
+          )}
+
+          {subscription.instructions && (
+            <div className="mt-4 rounded-xl bg-mist px-4 py-3 text-left">
+              <p className="text-xs text-mute">How to pay</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-ink">{subscription.instructions}</p>
+            </div>
+          )}
+
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-5 h-12 w-full rounded-2xl bg-signal font-bold text-ink active:bg-signal-dark"
+          >
+            I've paid, check again
+          </button>
+          <button
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="mt-2 h-11 w-full rounded-xl border border-line font-semibold text-ink disabled:opacity-50"
+          >
+            {loggingOut ? 'Logging out...' : 'Log out'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const online = driver.is_online
 
   return (
@@ -477,6 +579,21 @@ const loadPendingTrips = async () => {
 
         {/* Ride requests: fills the space, scrolls inside if there are many */}
         <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-3 pt-4">
+          {subscription.required &&
+            subscription.daysLeft !== null &&
+            subscription.daysLeft <= 5 && (
+              <div className="mb-3 rounded-xl bg-[#ffb703]/20 px-3.5 py-2.5 text-sm text-ink">
+                <p className="font-bold">
+                  {subscription.daysLeft <= 0
+                    ? 'Your subscription ends today'
+                    : `Your subscription ends in ${subscription.daysLeft} ${
+                        subscription.daysLeft === 1 ? 'day' : 'days'
+                      }`}
+                </p>
+                <p className="text-xs">Renew on time to keep receiving ride requests.</p>
+              </div>
+            )}
+
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-extrabold text-ink">Ride requests</h2>
             {online && pendingTrips.length > 0 && (

@@ -61,11 +61,23 @@ export async function POST(request) {
   if (busyError) debug.busyError = busyError.message
   const busyIds = new Set((busy || []).map((t) => t.driver_id))
 
-  const nearby = (drivers || []).filter(
+  let nearby = (drivers || []).filter(
     (d) =>
       !busyIds.has(d.id) &&
       distanceKm(d.current_lat, d.current_lng, trip.pickup_lat, trip.pickup_lng) <= RADIUS_KM
   )
+  // Drivers whose monthly subscription has lapsed don't get requests.
+  // (If the subscription feature isn't set up yet, this check is skipped.)
+  if (nearby.length > 0) {
+    const { data: activeIds, error: activeError } = await supabase.rpc('active_subscription_ids', {
+      p_ids: nearby.map((d) => d.id),
+    })
+    if (!activeError && Array.isArray(activeIds)) {
+      const active = new Set(activeIds)
+      nearby = nearby.filter((d) => active.has(d.id))
+    }
+  }
+
   debug.nearby = nearby.length
   if (nearby.length === 0) return Response.json({ notified: 0, debug })
 

@@ -27,11 +27,11 @@ function formatDateTime(value) {
 function PlaceRow({ label, dotClass, name, loading }) {
   return (
     <div className="flex items-start gap-3">
-      <span className={`mt-1.5 h-3 w-3 shrink-0 rounded-full ${dotClass}`} />
+      <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} />
       <div className="min-w-0">
-        <p className="text-xs text-mute">{label}</p>
+        <p className="text-[11px] leading-tight text-mute">{label}</p>
         {loading ? (
-          <div className="mt-1 h-4 w-40 rounded bg-mist motion-safe:animate-pulse" />
+          <div className="mt-1 h-3.5 w-40 rounded bg-mist motion-safe:animate-pulse" />
         ) : (
           <p className="text-sm font-semibold leading-snug text-ink">{name || 'Location unavailable'}</p>
         )}
@@ -192,37 +192,42 @@ export default function TripDetailsPage() {
         </PageHeader>
 
         <main className="mx-4 mt-4 space-y-3">
-          <section className="rounded-2xl border border-line bg-white p-4">
-            <div className="space-y-4">
+          <section className="rounded-2xl border border-line bg-white px-3 py-2.5">
+            <div className="space-y-2">
               <PlaceRow label="Pick-up" dotClass="bg-blue-600" name={pickupName} loading={namesLoading} />
               <PlaceRow label="Drop-off" dotClass="bg-red-500" name={dropoffName} loading={namesLoading} />
             </div>
           </section>
 
-          <section className="rounded-2xl border border-line bg-white p-4">
-            <p className="mb-3 text-xs text-mute">Passenger</p>
+          <section className="rounded-2xl border border-line bg-white px-3 py-2.5">
             {passengerLoading ? (
-              <div className="flex items-center gap-3 motion-safe:animate-pulse">
-                <div className="h-12 w-12 rounded-full bg-mist" />
-                <div className="space-y-2">
-                  <div className="h-4 w-32 rounded bg-mist" />
-                  <div className="h-3 w-24 rounded bg-mist" />
+              <div className="flex items-center gap-2.5 motion-safe:animate-pulse">
+                <div className="h-9 w-9 rounded-full bg-mist" />
+                <div className="space-y-1.5">
+                  <div className="h-2.5 w-16 rounded bg-mist" />
+                  <div className="h-3.5 w-28 rounded bg-mist" />
                 </div>
               </div>
             ) : passenger ? (
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-mist text-lg font-bold text-ink">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-mist text-sm font-bold text-ink">
                   {passenger.full_name?.charAt(0).toUpperCase() || '?'}
                 </div>
-                <p className="min-w-0 flex-1 truncate font-bold text-ink">
-                  {passenger.full_name || 'Passenger'}
-                </p>
+                <div className="min-w-0">
+                  <p className="text-[11px] leading-tight text-mute">Passenger</p>
+                  <p className="truncate text-sm font-semibold text-ink">
+                    {passenger.full_name || 'Passenger'}
+                  </p>
+                </div>
               </div>
             ) : (
-              <p className="text-sm text-mute">
-                Passenger details aren&apos;t available for this trip.
-                {passengerError && <span className="mt-1 block text-xs text-red-600">{passengerError}</span>}
-              </p>
+              <div>
+                <p className="text-[11px] leading-tight text-mute">Passenger</p>
+                <p className="text-sm text-mute">
+                  Details aren&apos;t available for this trip.
+                  {passengerError && <span className="mt-1 block text-xs text-red-600">{passengerError}</span>}
+                </p>
+              </div>
             )}
           </section>
 

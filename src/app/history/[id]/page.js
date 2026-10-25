@@ -33,7 +33,7 @@ function PlaceRow({ label, dotClass, name, loading }) {
         {loading ? (
           <div className="mt-1 h-4 w-40 rounded bg-mist motion-safe:animate-pulse" />
         ) : (
-          <p className="font-semibold text-ink">{name || 'Location unavailable'}</p>
+          <p className="text-sm font-semibold leading-snug text-ink">{name || 'Location unavailable'}</p>
         )}
       </div>
     </div>
@@ -214,18 +214,9 @@ export default function TripDetailsPage() {
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-mist text-lg font-bold text-ink">
                   {passenger.full_name?.charAt(0).toUpperCase() || '?'}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-bold text-ink">{passenger.full_name || 'Passenger'}</p>
-                  {passenger.phone && <p className="text-sm text-mute">{passenger.phone}</p>}
-                </div>
-                {passenger.phone && (
-                  <a
-                    href={`tel:${passenger.phone}`}
-                    className="flex h-11 shrink-0 items-center rounded-xl bg-ink px-4 text-sm font-bold text-white active:bg-ink/90"
-                  >
-                    Call
-                  </a>
-                )}
+                <p className="min-w-0 flex-1 truncate font-bold text-ink">
+                  {passenger.full_name || 'Passenger'}
+                </p>
               </div>
             ) : (
               <p className="text-sm text-mute">

@@ -48,6 +48,9 @@ export default function TripDetailsPage() {
   const [pickupName, setPickupName] = useState(null)
   const [dropoffName, setDropoffName] = useState(null)
   const [namesLoading, setNamesLoading] = useState(true)
+  const [passenger, setPassenger] = useState(null)
+  const [passengerLoading, setPassengerLoading] = useState(true)
+  const [passengerError, setPassengerError] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -72,6 +75,37 @@ export default function TripDetailsPage() {
     }
     load()
   }, [id, router])
+
+  // Passenger name + phone, via the same safe database function the live
+  // trip screen uses (rather than reading profiles directly).
+  useEffect(() => {
+    if (!trip) return
+    let cancelled = false
+
+    const loadPassenger = async () => {
+      setPassengerLoading(true)
+      setPassengerError('')
+
+      const { data, error } = await supabase.rpc('get_trip_passenger_contact', {
+        target_trip_id: trip.id,
+      })
+
+      if (cancelled) return
+
+      if (error) {
+        console.log('Could not load passenger contact:', error.message)
+        setPassengerError(error.message)
+      } else if (data && data.length > 0) {
+        setPassenger(data[0])
+      }
+      setPassengerLoading(false)
+    }
+
+    loadPassenger()
+    return () => {
+      cancelled = true
+    }
+  }, [trip])
 
   // Show a barangay / place name, never raw coordinates. Prefer a saved
   // address on the trip; otherwise look the name up from the coordinates.
@@ -163,6 +197,42 @@ export default function TripDetailsPage() {
               <PlaceRow label="Pick-up" dotClass="bg-blue-600" name={pickupName} loading={namesLoading} />
               <PlaceRow label="Drop-off" dotClass="bg-red-500" name={dropoffName} loading={namesLoading} />
             </div>
+          </section>
+
+          <section className="rounded-2xl border border-line bg-white p-4">
+            <p className="mb-3 text-xs text-mute">Passenger</p>
+            {passengerLoading ? (
+              <div className="flex items-center gap-3 motion-safe:animate-pulse">
+                <div className="h-12 w-12 rounded-full bg-mist" />
+                <div className="space-y-2">
+                  <div className="h-4 w-32 rounded bg-mist" />
+                  <div className="h-3 w-24 rounded bg-mist" />
+                </div>
+              </div>
+            ) : passenger ? (
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-mist text-lg font-bold text-ink">
+                  {passenger.full_name?.charAt(0).toUpperCase() || '?'}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-bold text-ink">{passenger.full_name || 'Passenger'}</p>
+                  {passenger.phone && <p className="text-sm text-mute">{passenger.phone}</p>}
+                </div>
+                {passenger.phone && (
+                  <a
+                    href={`tel:${passenger.phone}`}
+                    className="flex h-11 shrink-0 items-center rounded-xl bg-ink px-4 text-sm font-bold text-white active:bg-ink/90"
+                  >
+                    Call
+                  </a>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-mute">
+                Passenger details aren&apos;t available for this trip.
+                {passengerError && <span className="mt-1 block text-xs text-red-600">{passengerError}</span>}
+              </p>
+            )}
           </section>
 
           {(pickup || dropoff) && (

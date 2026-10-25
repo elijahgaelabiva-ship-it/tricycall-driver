@@ -84,7 +84,19 @@ export default function DriverHistoryPage() {
                 const when = new Date(trip.requested_at)
 
                 return (
-                  <article key={trip.id} className="rounded-2xl border border-line bg-white p-4">
+                  <article
+                    key={trip.id}
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => router.push(`/history/${trip.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        router.push(`/history/${trip.id}`)
+                      }
+                    }}
+                    className="cursor-pointer rounded-2xl border border-line bg-white p-4 active:bg-mist"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <p className="text-2xl font-extrabold tabular-nums text-ink">
                         ₱{Number(trip.fare || 0).toFixed(2)}

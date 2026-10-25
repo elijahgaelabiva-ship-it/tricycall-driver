@@ -24,6 +24,29 @@ function formatDateTime(value) {
   return `${d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}, ${d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })}`
 }
 
+// Passenger photo, falling back to their initial if there's no photo
+// or it fails to load.
+function PassengerAvatar({ url, name }) {
+  const [failed, setFailed] = useState(false)
+
+  if (url && !failed) {
+    return (
+      <img
+        src={url}
+        alt={name ? `${name}'s photo` : 'Passenger photo'}
+        onError={() => setFailed(true)}
+        className="h-9 w-9 shrink-0 rounded-full object-cover"
+      />
+    )
+  }
+
+  return (
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-mist text-sm font-bold text-ink">
+      {name?.charAt(0).toUpperCase() || '?'}
+    </div>
+  )
+}
+
 function PlaceRow({ label, dotClass, name, loading }) {
   return (
     <div className="flex items-start gap-3">
@@ -210,9 +233,7 @@ export default function TripDetailsPage() {
               </div>
             ) : passenger ? (
               <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-mist text-sm font-bold text-ink">
-                  {passenger.full_name?.charAt(0).toUpperCase() || '?'}
-                </div>
+                <PassengerAvatar url={passenger.avatar_url} name={passenger.full_name} />
                 <div className="min-w-0">
                   <p className="text-[11px] leading-tight text-mute">Passenger</p>
                   <p className="truncate text-sm font-semibold text-ink">

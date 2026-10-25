@@ -16,6 +16,19 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "TRICYCALL.SF Driver",
   description: "Receive and accept tricycle ride requests in San Felipe.",
+  manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/icons/driver-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/driver-icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/driver-icon-192.png", sizes: "192x192", type: "image/png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "TC Driver",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport: Viewport = {

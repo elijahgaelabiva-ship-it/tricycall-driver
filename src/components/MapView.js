@@ -25,7 +25,7 @@ const passengerIcon = new L.Icon({
 
 // San Felipe, Zambales fallback center. The map must render immediately on
 // open rather than waiting for GPS permission/fix.
-const SAN_FELIPE_CENTER = { lat: 15.186, lng: 120.141 }
+const SAN_FELIPE_CENTER = { lat: 15.06, lng: 120.0702 }
 
 const PRIMARY_TILE_URL = `https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=${process.env.NEXT_PUBLIC_CARTO_API_KEY}`
 const FALLBACK_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'

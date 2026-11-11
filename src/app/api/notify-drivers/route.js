@@ -48,6 +48,8 @@ export async function POST(request) {
     .from('drivers')
     .select('id, current_lat, current_lng')
     .eq('is_online', true)
+    .eq('is_approved', true)
+    .or('is_suspended.is.null,is_suspended.eq.false')
     .not('current_lat', 'is', null)
     .not('current_lng', 'is', null)
   if (driversError) debug.driversError = driversError.message

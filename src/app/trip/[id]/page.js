@@ -17,12 +17,31 @@ export default function DriverTripPage() {
   const [noShowError, setNoShowError] = useState('')
   const [passenger, setPassenger] = useState(null)
   const [passengerError, setPassengerError] = useState('')
+  const [loadError, setLoadError] = useState('')
+  const myIdRef = useRef(null)
   const tripStatusRef = useRef(null)
   const watchIdRef = useRef(null)
 
   useEffect(() => {
     const loadTrip = async () => {
-      const { data } = await supabase.from('trips').select('*').eq('id', id).single()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      myIdRef.current = user?.id || null
+
+      const { data, error } = await supabase.from('trips').select('*').eq('id', id).single()
+
+      if (error || !data) {
+        setLoadError('We could not find this trip.')
+        return
+      }
+
+      // Only the driver assigned to a trip may open it.
+      if (!user || data.driver_id !== user.id) {
+        setLoadError('This trip is not assigned to you.')
+        return
+      }
+
       setTrip(data)
     }
     loadTrip()
@@ -38,6 +57,7 @@ export default function DriverTripPage() {
           filter: `id=eq.${id}`,
         },
         (payload) => {
+          if (payload.new.driver_id !== myIdRef.current) return
           setTrip(payload.new)
         }
       )
@@ -152,6 +172,9 @@ export default function DriverTripPage() {
     }
   }, [trip?.driver_id])
 
+  // The status a trip must currently have for each transition.
+  const PREVIOUS_STATUS = { arrived: 'accepted', ongoing: 'arrived', completed: 'ongoing' }
+
   const updateStatus = async (newStatus) => {
     setUpdating(true)
 
@@ -160,15 +183,23 @@ export default function DriverTripPage() {
       updates.completed_at = new Date().toISOString()
     }
 
-    const { error } = await supabase
-      .from('trips')
-      .update(updates)
-      .eq('id', id)
+    let query = supabase.from('trips').update(updates).eq('id', id)
+    // Only move forward from the expected status, so a trip the passenger
+    // cancelled in the meantime can never be flipped to completed.
+    if (PREVIOUS_STATUS[newStatus]) {
+      query = query.eq('status', PREVIOUS_STATUS[newStatus])
+    }
+    const { data: changed, error } = await query.select('id')
 
     if (error) {
       alert('Error updating trip: ' + error.message)
+    } else if (!changed || changed.length === 0) {
+      // Nothing changed: the trip is no longer in the expected state.
+      const { data: fresh } = await supabase.from('trips').select('*').eq('id', id).single()
+      if (fresh) setTrip(fresh)
+      alert('This trip was changed (it may have been cancelled). Showing the latest status.')
     } else {
-      setTrip({ ...trip, ...updates })
+      setTrip((prev) => (prev ? { ...prev, ...updates } : prev))
     }
 
     setUpdating(false)
@@ -204,6 +235,22 @@ export default function DriverTripPage() {
     ongoing: { title: 'Trip in progress', sub: 'Take your passenger to the drop-off point.' },
     completed: { title: 'Trip completed', sub: 'Nice work!' },
     cancelled: { title: 'Trip cancelled', sub: 'This ride was cancelled.' },
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-mist px-6">
+        <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-sm">
+          <p className="font-bold text-ink">{loadError}</p>
+          <button
+            onClick={() => router.replace('/dashboard')}
+            className="mt-4 h-12 w-full rounded-xl bg-signal font-bold text-ink active:bg-signal-dark"
+          >
+            Back to dashboard
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (!trip) {

@@ -114,13 +114,22 @@ export default function DriverHistoryPage() {
         return
       }
 
-      const { data } = await supabase
-        .from('trips')
-        .select('*')
-        .eq('driver_id', user.id)
-        .order('requested_at', { ascending: false })
+      // Page through the results: a single query is capped (1000 rows by default).
+      const PAGE = 1000
+      let all = []
+      for (let from = 0; ; from += PAGE) {
+        const { data: page, error: pageError } = await supabase
+          .from('trips')
+          .select('*')
+          .eq('driver_id', user.id)
+          .order('requested_at', { ascending: false })
+          .range(from, from + PAGE - 1)
+        if (pageError || !page) break
+        all = all.concat(page)
+        if (page.length < PAGE) break
+      }
 
-      setTrips(data || [])
+      setTrips(all)
       setLoading(false)
     }
 

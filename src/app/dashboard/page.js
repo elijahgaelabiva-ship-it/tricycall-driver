@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { enablePush } from '@/lib/push'
 
 const ACTIVE_STATUSES = ['accepted', 'arrived', 'ongoing']
+// Requests older than this are treated as abandoned and hidden from the list.
+const MAX_REQUEST_AGE_MS = 15 * 60 * 1000
 
 function timeAgo(iso) {
   if (!iso) return ''
@@ -25,7 +27,8 @@ export default function DriverDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [loggingOut, setLoggingOut] = useState(false)
   const [pendingTrips, setPendingTrips] = useState([])
-const [skippedIds, setSkippedIds] = useState([])  
+const [skippedIds, setSkippedIds] = useState([])
+  const skippedIdsRef = useRef([])  
 const [accepting, setAccepting] = useState(null)
   const [pushStatus, setPushStatus] = useState(null)
   const [subscription, setSubscription] = useState({
@@ -117,6 +120,14 @@ const [accepting, setAccepting] = useState(null)
       // No Online/Offline button: a logged-in, approved driver is online.
       // (Logging out sets them offline.)
       let currentDriver = driverData
+      if (driverData && (!driverData.is_approved || driverData.is_suspended)) {
+        // Un-approved or suspended after going online: make sure they stop
+        // receiving requests and don't show up on passengers' maps.
+        if (driverData.is_online) {
+          await supabase.from('drivers').update({ is_online: false }).eq('id', user.id)
+        }
+        currentDriver = { ...driverData, is_online: false }
+      }
       if (driverData?.is_approved && !driverData.is_suspended) {
         if (!sub.active) {
           // Expired subscription: not online, no requests
@@ -222,7 +233,14 @@ const loadPendingTrips = async () => {
         .eq('status', 'requested')
         .order('requested_at', { ascending: false })
 
-      setPendingTrips((data || []).filter((t) => !skippedIds.includes(t.id)))
+      const cutoff = Date.now() - MAX_REQUEST_AGE_MS
+      setPendingTrips(
+        (data || []).filter(
+          (t) =>
+            !skippedIdsRef.current.includes(t.id) &&
+            (!t.requested_at || new Date(t.requested_at).getTime() >= cutoff)
+        )
+      )
     }
 
     loadPendingTrips()
@@ -325,7 +343,7 @@ const loadPendingTrips = async () => {
       return
     }
 
-    const { error } = await supabase
+    const { data: claimed, error } = await supabase
       .from('trips')
       .update({
         driver_id: driver.id,
@@ -333,9 +351,18 @@ const loadPendingTrips = async () => {
       })
       .eq('id', tripId)
       .eq('status', 'requested') // prevents accepting a trip someone else already took
+      .select('id')
 
     if (error) {
       alert('Could not accept trip: ' + error.message)
+      setAccepting(null)
+      return
+    }
+
+    // No row changed: another driver took it (or the passenger cancelled).
+    if (!claimed || claimed.length === 0) {
+      alert('Sorry, this ride is no longer available.')
+      setPendingTrips((prev) => prev.filter((t) => t.id !== tripId))
       setAccepting(null)
       return
     }
@@ -584,7 +611,11 @@ const loadPendingTrips = async () => {
             subscription.daysLeft <= 5 && (
               <div className="mb-3 rounded-xl bg-[#ffb703]/20 px-3.5 py-2.5 text-sm text-ink">
                 <p className="font-bold">
-                  {subscription.daysLeft <= 0
+                  {subscription.daysLeft < 0
+                    ? `Your subscription ended ${-subscription.daysLeft} ${
+                        subscription.daysLeft === -1 ? 'day' : 'days'
+                      } ago`
+                    : subscription.daysLeft === 0
                     ? 'Your subscription ends today'
                     : `Your subscription ends in ${subscription.daysLeft} ${
                         subscription.daysLeft === 1 ? 'day' : 'days'
@@ -650,6 +681,7 @@ const loadPendingTrips = async () => {
                     </button>
                     <button
                       onClick={() => {
+                        skippedIdsRef.current = [...skippedIdsRef.current, trip.id]
                         setSkippedIds((prev) => [...prev, trip.id])
                         setPendingTrips((prev) => prev.filter((t) => t.id !== trip.id))
                       }}

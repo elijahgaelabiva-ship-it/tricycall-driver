@@ -59,6 +59,13 @@ const [accepting, setAccepting] = useState(null)
         .eq('id', user.id)
         .single()
 
+      // A passenger/admin account must not use the driver app.
+      if (profileData && profileData.role !== 'driver') {
+        await supabase.auth.signOut()
+        router.replace(`/login?from=intro&wrong=${profileData.role || 'none'}`)
+        return
+      }
+
       const { data: driverData } = await supabase
         .from('drivers')
         .select('*')

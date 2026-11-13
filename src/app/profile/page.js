@@ -63,14 +63,19 @@ export default function DriverProfilePage() {
       data: { user },
     } = await supabase.auth.getUser()
 
-    const { url, error } = await uploadAvatar(user.id, blob)
+    const { url, pending, pendingAt, error } = await uploadAvatar(user.id, blob)
     if (error) {
       setUploadError(error)
       setUploading(false)
       return
     }
 
-    setProfile((prev) => ({ ...prev, avatar_url: url }))
+    if (pending) {
+      // Approved drivers keep their current photo until an admin approves the new one
+      setProfile((prev) => ({ ...prev, pending_avatar_at: pendingAt }))
+    } else {
+      setProfile((prev) => ({ ...prev, avatar_url: url }))
+    }
     setUploading(false)
   }
 
@@ -154,6 +159,12 @@ export default function DriverProfilePage() {
               </svg>
               {uploading ? 'Saving photo...' : 'Take new photo'}
             </button>
+
+            {profile?.pending_avatar_at && (
+              <p className="mt-3 rounded-lg bg-white/10 px-3 py-2 text-sm text-white/90">
+                Your new photo was sent. It will replace your current photo once an admin approves it.
+              </p>
+            )}
 
             {uploadError && (
               <p className="mt-3 rounded-lg bg-red-500/20 px-3 py-2 text-sm text-red-100">

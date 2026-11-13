@@ -1,8 +1,22 @@
 import { supabase } from '@/lib/supabase'
 
-// Uploads a camera photo (Blob) as the driver's profile picture.
-// Returns { url } on success or { error } on failure.
+// Saves a camera photo (Blob) for the driver.
+//
+// - Not yet approved (registration): the photo becomes the profile picture
+//   right away. Returns { url }.
+// - Approved driver: the live photo is locked, so the new photo is saved as a
+//   pending photo that an admin must approve. Returns { pending: true }.
+//
+// Returns { error } on failure.
 export async function uploadAvatar(userId, blob) {
+  const { data: driver } = await supabase
+    .from('drivers')
+    .select('is_approved')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (driver?.is_approved) return uploadPendingAvatar(userId, blob)
+
   const filePath = `${userId}/avatar.jpg`
 
   const { error: uploadErr } = await supabase.storage
@@ -21,4 +35,20 @@ export async function uploadAvatar(userId, blob) {
   if (updateErr) return { error: updateErr.message }
 
   return { url }
+}
+
+async function uploadPendingAvatar(userId, blob) {
+  const { error: uploadErr } = await supabase.storage
+    .from('avatars')
+    .upload(`${userId}/pending.jpg`, blob, { upsert: true, contentType: 'image/jpeg' })
+  if (uploadErr) return { error: uploadErr.message }
+
+  const at = new Date().toISOString()
+  const { error: updateErr } = await supabase
+    .from('profiles')
+    .update({ pending_avatar_at: at })
+    .eq('id', userId)
+  if (updateErr) return { error: updateErr.message }
+
+  return { pending: true, pendingAt: at }
 }
